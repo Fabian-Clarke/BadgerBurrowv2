@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  SafeAreaView,
   View,
   Text,
   StyleSheet,
@@ -9,8 +8,10 @@ import {
   ScrollView,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function Listings({ navigation }) {
+
+export default function Listings({ navigation, onBack }) {
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
 
@@ -34,11 +35,15 @@ export default function Listings({ navigation }) {
         style={styles.mascot}
       />
 
-      <View style={styles.header}>
-        <Text style={styles.appTitle}>Badger Burrow</Text>
-        <Text style={styles.appSubtitle}>
-          Connect. Study. Trade. Thrive.
-        </Text>
+      <View style={styles.headerRow}>
+        <View style={styles.headerTextWrap}>
+          <Text style={styles.appTitle}>Badger Burrow</Text>
+          <Text style={styles.appSubtitle}>Connect. Study. Trade. Thrive.</Text>
+        </View>
+
+        <TouchableOpacity onPress={onBack} style={styles.backButton}>
+          <Text style={styles.backText}>← Back</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity
@@ -130,9 +135,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
-  header: {
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingTop: 24,
     paddingBottom: 16,
+    gap: 12,             // gives a little spacing between ← Back and the title text
+  },
+
+  backButton: {
+    paddingRight: 8,     // expand touch area slightly
+  },
+
+  backText: {
+    color: '#c5050c',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+
+  headerTextWrap: {
+    flexDirection: 'column',
   },
 
   appTitle: {
@@ -144,7 +167,7 @@ const styles = StyleSheet.create({
   appSubtitle: {
     fontSize: 14,
     color: '#636c7a',
-    marginTop: 4,
+    marginTop: 2,
   },
 
   newListingButton: {
@@ -180,6 +203,12 @@ const styles = StyleSheet.create({
 
   tabChipActive: {
     backgroundColor: '#c5050c',
+  },
+
+  backText: {
+    color: '#c5050c',
+    fontWeight: '600',
+    fontSize: 16,
   },
 
   tabChipText: {
