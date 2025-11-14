@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  SafeAreaView,
   View,
   Text,
   TextInput,
@@ -8,6 +7,18 @@ import {
   StyleSheet,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';
+
+const handleSubmit = async () => {
+  try {
+    if (!email || !password) throw new Error('Please fill out every field.');
+    await signInWithEmailAndPassword(auth, email, password);
+    setMessage('');
+  } catch (err) {
+    setMessage(err.message);
+  }
+};
 
 export default function SignIn({ onGoToSignUp }) {
   const [email, setEmail] = useState('');
