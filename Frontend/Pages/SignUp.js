@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+} from 'firebase/auth';
+import { auth } from '../../firebase';
 
 export default function SignUp({ onGoToSignIn }) {
   const [name, setName] = useState('');
@@ -15,18 +15,29 @@ export default function SignUp({ onGoToSignIn }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState('');
 
-  const handleSubmit = () => {
-    if (!name || !email || !password || !confirmPassword) {
-      setMessage('Please fill out every field.');
-      return;
-    }
+  const handleSubmit = async () => {
+    try {
+      if (!name || !email || !password || !confirmPassword) {
+        throw new Error('Please fill out every field.');
+      }
+      if (password !== confirmPassword) {
+        throw new Error('Passwords do not match.');
+      }
 
-    if (password !== confirmPassword) {
-      setMessage('Passwords do not match.');
-      return;
-    }
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
 
-    setMessage(`Welcome aboard, ${name || email}!`);
+      if (name) {
+        await updateProfile(cred.user, { displayName: name });
+      }
+
+      setMessage(`Welcome aboard, ${name || cred.user.email}!`);
+    } catch (err) {
+      setMessage(err.message);
+    }
   };
 
   return (

@@ -1,37 +1,25 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
-
-const handleSubmit = async () => {
-  try {
-    if (!email || !password) throw new Error('Please fill out every field.');
-    await signInWithEmailAndPassword(auth, email, password);
-    setMessage('');
-  } catch (err) {
-    setMessage(err.message);
-  }
-};
+import { auth } from '../../firebase';
 
 export default function SignIn({ onGoToSignUp }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
 
-  const handleSubmit = () => {
-    if (!email || !password) {
-      setMessage('Please fill out every field.');
-      return;
+  const handleSubmit = async () => {
+    try {
+      if (!email || !password) {
+        throw new Error('Please fill out every field.');
+      }
+      await signInWithEmailAndPassword(auth, email, password);
+      setMessage('');
+    } catch (err) {
+      setMessage(err.message);
     }
-
-    setMessage(`Signed in as ${email}.`);
   };
 
   return (
