@@ -1,5 +1,6 @@
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 
 const buttons = [
   { label: 'Listings', route: 'listings' },
@@ -10,6 +11,10 @@ const buttons = [
 export default function HomePage({ onNavigate }) {
   return (
     <SafeAreaView style={styles.container}>
+      <Image
+        source={require('../../assets/Badger.png')}
+        style={styles.mascot}
+      />
       <View style={styles.top}>
         <View style={styles.header}>
           <TouchableOpacity
@@ -44,7 +49,7 @@ export default function HomePage({ onNavigate }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f6f8fb',
+    backgroundColor: '#636c7a',
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 24,
@@ -102,5 +107,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 18,
     fontWeight: '600',
+  },
+  mascot: {
+    position: 'absolute',
+    bottom: -10,
+    left: -10,
+    width: 200,
+    height: 200,
+    opacity: 0.17,
+    zIndex: -1,
   },
 });

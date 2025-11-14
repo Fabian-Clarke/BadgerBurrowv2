@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image,} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -42,19 +42,27 @@ export default function SignUp({ onGoToSignIn }) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <TouchableOpacity style={styles.backButton} onPress={onGoToSignIn}>
+        <Text style={styles.backArrow}>← Back to Sign In</Text>
+      </TouchableOpacity>
+      <Image
+        source={require('../../assets/Badger.png')}
+        style={styles.mascot}
+      />
+
       <View style={styles.card}>
-        <Text style={styles.title}>Create an account</Text>
+        <Text style={styles.title}>Sign Up</Text>
         <Text style={styles.subtitle}>
-          Sign up to start exploring Badger Burrow.
+          Create an account to start using Badger Burrow.
         </Text>
 
         <TextInput
           style={styles.input}
-          placeholder="Full name"
+          placeholder="User Name"
           value={name}
           onChangeText={setName}
-          autoCapitalize="words"
-          returnKeyType="next"
+        //   autoCapitalize="words"
+        //   returnKeyType="next"
         />
 
         <TextInput
@@ -69,7 +77,7 @@ export default function SignUp({ onGoToSignIn }) {
 
         <TextInput
           style={styles.input}
-          placeholder="Password"
+          placeholder="Enter password"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -90,16 +98,22 @@ export default function SignUp({ onGoToSignIn }) {
         {message ? <Text style={styles.message}>{message}</Text> : null}
 
         <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-          <Text style={styles.buttonText}>Sign Up</Text>
+          <Text style={styles.buttonText}>Create Account</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={onGoToSignIn}>
           <Text style={styles.toggleText}>
-            Already have an account? Sign in
+            Already have an account? <Text style={styles.link}>Sign in</Text>
           </Text>
         </TouchableOpacity>
       </View>
-      <StatusBar style="auto" />
+
+      <View style={styles.branding}>
+        <Text style={styles.tagline}>Connect. Study. Trade. Thrive.</Text>
+        <Text style={styles.brand}>BADGER BURROW</Text>
+      </View>
+
+      <StatusBar style="light" />
     </SafeAreaView>
   );
 }
@@ -107,57 +121,120 @@ export default function SignUp({ onGoToSignIn }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f6f8fb',
+    backgroundColor: '#c5050c', 
     justifyContent: 'center',
-    padding: 24,
+    paddingHorizontal: 24,
   },
+
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 10,
+    zIndex: 10,
+    padding: 10,
+  },
+
+  backArrow: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
     padding: 24,
-    gap: 16,
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 4,
   },
+
   title: {
     fontSize: 26,
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'center',
+    marginBottom: 4,
+    color: '#000',
   },
+
   subtitle: {
     fontSize: 14,
     textAlign: 'center',
-    color: '#636c7a',
+    color: '#333',
+    marginBottom: 18,
   },
+
   input: {
     borderWidth: 1,
     borderColor: '#d8dee6',
+    backgroundColor: '#fff',
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderRadius: 10,
     fontSize: 16,
+    marginBottom: 12,
   },
+
   button: {
-    backgroundColor: '#c5050c',
+    backgroundColor: '#fff',
     paddingVertical: 14,
     borderRadius: 10,
+    marginTop: 4,
   },
+
   buttonText: {
-    color: '#fff',
+    color: '#c5050c',
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '600',
   },
+
   toggleText: {
     textAlign: 'center',
-    color: '#c5050c',
-    fontWeight: '500',
+    color: '#fff',
+    fontSize: 14,
+    marginTop: 10,
   },
+
+  link: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+
   message: {
     textAlign: 'center',
-    color: '#636c7a',
+    color: '#fff',
+    marginTop: 6,
+  },
+
+  branding: {
+    marginTop: 40,
+    alignItems: 'center',
+  },
+
+  tagline: {
+    fontSize: 15,
+    color: '#fff',
+    marginBottom: 4,
+  },
+
+  brand: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    color: '#fff',
+  },
+
+  mascot: {
+    position: 'absolute',
+    bottom: -10,
+    left: -20,
+    width: 200,
+    height: 200,
+    opacity: 0.16, 
+    zIndex: -1,
   },
 });
+
