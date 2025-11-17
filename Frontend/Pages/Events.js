@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function Events({ onBack }) {
+export default function Events({ onBack, onGoToAddEvent }) {
   const [activeTab, setActiveTab] = useState('recent');
   const [search, setSearch] = useState('');
 
@@ -91,10 +91,13 @@ export default function Events({ onBack }) {
       </ScrollView>
 
       {/* New Event Button (center bottom) */}
-      <TouchableOpacity style={styles.newEventButton}>
+      <TouchableOpacity
+        style={styles.newEventButton}
+        onPress={onGoToAddEvent}
+      >
         <Text style={styles.newEventText}>＋ New Event</Text>
       </TouchableOpacity>
-    </SafeAreaView>
+      </SafeAreaView>
   );
 }
 
