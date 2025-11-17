@@ -10,16 +10,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function Events({ onBack, onGoToAddEvent }) {
+export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
   const [activeTab, setActiveTab] = useState('recent');
   const [search, setSearch] = useState('');
 
   // Dummy event data for now
   const events = [
-    { id: 1, title: 'Witte Soccer Adventure', time: '3:30pm to 4:00pm' },
-    { id: 2, title: 'Bascom Flamingo Attack', time: '8:15am to 9:15am' },
-    { id: 3, title: 'Event', time: 'Time:' },
-    { id: 4, title: 'Event', time: 'Time:' },
+    { id: 1, title: 'Witte Soccer Adventure', date: 'Nov 20, 2025', time: '3:30pm - 4:00pm' },
+    { id: 2, title: 'Bascom Flamingo Attack', date: 'Nov 22, 2025', time: '8:15am - 9:15am' },
+    { id: 3, title: 'Event', date: 'Date', time: 'Time' },
+    { id: 4, title: 'Event', date: 'Date', time: 'Time' },
   ];
 
   return (
@@ -81,9 +81,14 @@ export default function Events({ onBack, onGoToAddEvent }) {
         {events.map(item => (
           <View key={item.id} style={styles.card}>
             <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardTime}>{item.time}</Text>
+            <Text style={styles.cardTime}>
+              {item.date} • {item.time}
+            </Text>
 
-            <TouchableOpacity style={styles.moreInfoButton}>
+            <TouchableOpacity
+              style={styles.moreInfoButton}
+              onPress={onOpenEventDetails}
+            >
               <Text style={styles.moreInfoText}>MORE INFO</Text>
             </TouchableOpacity>
           </View>

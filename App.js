@@ -7,6 +7,7 @@ import StudyGroups from './Frontend/Pages/StudyGroups';
 import Events from './Frontend/Pages/Events';
 import Account from './Frontend/Pages/Account';
 import AddEvent from './Frontend/Pages/AddEvent';
+import EventDetails from './Frontend/Pages/EventDetails';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 
@@ -49,6 +50,7 @@ export default function App() {
       <Events
         onBack={() => setScreen('home')}
         onGoToAddEvent={() => setScreen('add-event')}
+        onOpenEventDetails={() => setScreen('event-details')}
       />
     );
   }
@@ -60,6 +62,10 @@ export default function App() {
   if (screen === 'account') {
     return <Account onBack={() => setScreen('home')} />;
   }
+
+  if (screen === 'event-details') {
+  return <EventDetails onBack={() => setScreen('events')} />;
+}
 
   return null;
 }
