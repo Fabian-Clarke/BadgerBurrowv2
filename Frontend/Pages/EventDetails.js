@@ -6,6 +6,7 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,6 +17,7 @@ import {
   arrayUnion,
   arrayRemove,
   increment,
+  deleteDoc,
 } from 'firebase/firestore';
 
 export default function EventDetails({ onBack, event }) {
@@ -56,6 +58,32 @@ export default function EventDetails({ onBack, event }) {
 
   const [liked, setLiked] = useState(initialLiked);
   const [likesCount, setLikesCount] = useState(event?.likesCount ?? 0);
+
+  const canDelete = !!event && !!user && event.createdBy === user.uid;
+
+  const requestDelete = () => {
+    if (!canDelete) return;
+    Alert.alert(
+      'Delete Event',
+      'Are you sure you want to remove this event? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: handleDeleteEvent },
+      ]
+    );
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!event?.id) return;
+    try {
+      await deleteDoc(doc(db, 'events', event.id));
+      if (onBack) {
+        onBack();
+      }
+    } catch (err) {
+      console.log('Failed to delete event:', err);
+    }
+  };
 
   const handleToggleLike = async () => {
     if (!event || !event.id) {
@@ -158,6 +186,27 @@ export default function EventDetails({ onBack, event }) {
             <Text style={styles.infoLabel}>📝 Description</Text>
             <Text style={styles.infoValue}>{data.description}</Text>
           </View>
+
+          {/* Like button */}
+          {event && (
+            <TouchableOpacity
+              style={styles.likeButton}
+              onPress={handleToggleLike}
+            >
+              <Text style={styles.likeButtonText}>
+                {liked ? 'Unlike Event' : 'Like Event'} ({likesCount})
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {canDelete && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={requestDelete}
+            >
+              <Text style={styles.deleteButtonText}>Delete Event</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -238,5 +287,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#222',
+  },
+  likeButton: {
+    marginTop: 20,
+    alignSelf: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#c5050c',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+  },
+  likeButtonText: {
+    color: '#c5050c',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  deleteButton: {
+    marginTop: 28,
+    alignSelf: 'center',
+    backgroundColor: '#c5050c',
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: 26,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
   },
 });
