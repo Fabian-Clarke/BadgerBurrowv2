@@ -6,7 +6,8 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
 } from 'firebase/auth';
-import { auth } from '../../firebase';
+import { auth, db } from '../../firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function SignUp({ onGoToSignIn }) {
   const [name, setName] = useState('');
@@ -14,8 +15,11 @@ export default function SignUp({ onGoToSignIn }) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState(null);
 
   const handleSubmit = async () => {
+    setMessage('');
+    setMessageType(null);
     try {
       if (!name || !email || !password || !confirmPassword) {
         throw new Error('Please fill out every field.');
@@ -34,9 +38,18 @@ export default function SignUp({ onGoToSignIn }) {
         await updateProfile(cred.user, { displayName: name });
       }
 
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        uid: cred.user.uid,
+        email: cred.user.email,
+        displayName: name || cred.user.displayName || '',
+        createdAt: serverTimestamp(),
+      });
+
       setMessage(`Welcome aboard, ${name || cred.user.email}!`);
+      setMessageType('success');
     } catch (err) {
       setMessage(err.message);
+      setMessageType('error');
     }
   };
 
@@ -95,7 +108,16 @@ export default function SignUp({ onGoToSignIn }) {
           returnKeyType="done"
         />
 
-        {message ? <Text style={styles.message}>{message}</Text> : null}
+        {message ? (
+          <Text
+            style={[
+              styles.message,
+              messageType === 'error' ? styles.messageError : styles.messageSuccess,
+            ]}
+          >
+            {message}
+          </Text>
+        ) : null}
 
         <TouchableOpacity style={styles.button} onPress={handleSubmit}>
           <Text style={styles.buttonText}>Create Account</Text>
@@ -205,8 +227,14 @@ const styles = StyleSheet.create({
 
   message: {
     textAlign: 'center',
-    color: '#fff',
     marginTop: 6,
+    fontWeight: '600',
+  },
+  messageError: {
+    color: '#c5050c',
+  },
+  messageSuccess: {
+    color: '#0a7f2e',
   },
 
   branding: {
@@ -237,4 +265,3 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
 });
-

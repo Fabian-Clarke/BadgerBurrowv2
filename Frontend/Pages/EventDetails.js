@@ -9,24 +9,96 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function EventDetails({ onBack }) {
-  // For now, placeholder event data
-  const event = {
-    title: "Witte Soccer Adventure",
+import { auth, db } from '../../firebase';
+import {
+  doc,
+  updateDoc,
+  arrayUnion,
+  arrayRemove,
+  increment,
+} from 'firebase/firestore';
+
+export default function EventDetails({ onBack, event }) {
+  // Fallback placeholder event if none is passed 
+  const placeholderEvent = {
+    title: 'Witte Soccer Adventure',
     description:
-      "Join us for a fun soccer event at Witte Field! Bring your friends and enjoy a casual game, no experience required.",
-    date: "Nov 20, 2025",
-    time: "3:30pm - 4:00pm",
-    location: "Witte Field",
-    price: "Free",
-    contact: "@badgersoccer",
+      'Join us for a fun soccer event at Witte Field! Bring your friends and enjoy a casual game, no experience required.',
+    date: 'Nov 20, 2025',
+    time: '3:30pm - 4:00pm',
+    location: 'Witte Field',
+    price: 'Free',
+    contact: '@badgersoccer',
   };
 
-  const [liked, setLiked] = useState(false);
+  const user = auth.currentUser || null;
+
+  const data = event || placeholderEvent;
+
+  let dateStr = data.date || 'Date';
+  let timeStr = data.time || 'Time';
+
+  if (!data.date && !data.time && event?.startDateTime?.toDate) {
+    const d = event.startDateTime.toDate();
+    dateStr = d.toLocaleDateString();
+    timeStr = d.toLocaleTimeString([], {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
+
+  // Likes
+  const initialLiked =
+    !!event &&
+    !!user &&
+    Array.isArray(event.likedBy) &&
+    event.likedBy.includes(user.uid);
+
+  const [liked, setLiked] = useState(initialLiked);
+  const [likesCount, setLikesCount] = useState(event?.likesCount ?? 0);
+
+  const handleToggleLike = async () => {
+    if (!event || !event.id) {
+      setLiked((prev) => !prev);
+      return;
+    }
+
+    if (!user) {
+      console.log('Like ignored – no signed-in user');
+      return;
+    }
+
+    const newLiked = !liked;
+    setLiked(newLiked);
+    setLikesCount((prev) => prev + (newLiked ? 1 : -1));
+
+    try {
+      const ref = doc(db, 'events', event.id);
+
+      if (newLiked) {
+        await updateDoc(ref, {
+          likesCount: increment(1),
+          likedBy: arrayUnion(user.uid),
+        });
+      } else {
+        await updateDoc(ref, {
+          likesCount: increment(-1),
+          likedBy: arrayRemove(user.uid),
+        });
+      }
+    } catch (err) {
+      console.log('Error updating like:', err);
+    }
+  };
+
+  // Use uploaded image if provided, otherwise fallback to Badger.png
+  const bannerSource =
+    event && event.imageUrl
+      ? { uri: event.imageUrl }
+      : require('../../assets/Badger.png');
 
   return (
     <SafeAreaView style={styles.container}>
-      
       {/* Header */}
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={onBack}>
@@ -40,20 +112,15 @@ export default function EventDetails({ onBack }) {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        
         {/* Banner Image */}
-        <Image
-          source={require('../../assets/Badger.png')}
-          style={styles.banner}
-        />
+        <Image source={bannerSource} style={styles.banner} />
 
         <View style={styles.contentContainer}>
-          
           {/* Title + Like */}
           <View style={styles.titleRow}>
-            <Text style={styles.eventTitle}>{event.title}</Text>
+            <Text style={styles.eventTitle}>{data.title}</Text>
 
-            <TouchableOpacity onPress={() => setLiked(!liked)}>
+            <TouchableOpacity onPress={handleToggleLike}>
               <Text style={[styles.likeHeart, liked && styles.liked]}>
                 {liked ? '❤️' : '🤍'}
               </Text>
@@ -64,32 +131,32 @@ export default function EventDetails({ onBack }) {
           <View style={styles.infoBlock}>
             <Text style={styles.infoLabel}>📅 Date & Time</Text>
             <Text style={styles.infoValue}>
-              {event.date} • {event.time}
+              {dateStr} • {timeStr}
             </Text>
           </View>
 
           {/* Location */}
           <View style={styles.infoBlock}>
             <Text style={styles.infoLabel}>📍 Location</Text>
-            <Text style={styles.infoValue}>{event.location}</Text>
+            <Text style={styles.infoValue}>{data.location}</Text>
           </View>
 
           {/* Price */}
           <View style={styles.infoBlock}>
             <Text style={styles.infoLabel}>💲 Price</Text>
-            <Text style={styles.infoValue}>{event.price}</Text>
+            <Text style={styles.infoValue}>{data.price}</Text>
           </View>
 
           {/* Contact */}
           <View style={styles.infoBlock}>
             <Text style={styles.infoLabel}>📞 Contact</Text>
-            <Text style={styles.infoValue}>{event.contact}</Text>
+            <Text style={styles.infoValue}>{data.contact}</Text>
           </View>
 
           {/* Description */}
           <View style={styles.infoBlock}>
             <Text style={styles.infoLabel}>📝 Description</Text>
-            <Text style={styles.infoValue}>{event.description}</Text>
+            <Text style={styles.infoValue}>{data.description}</Text>
           </View>
         </View>
       </ScrollView>

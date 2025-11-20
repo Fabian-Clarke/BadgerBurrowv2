@@ -14,6 +14,7 @@ import { auth } from './firebase';
 
 export default function App() {
   const [screen, setScreen] = useState('loading');
+  const [selectedEvent, setSelectedEvent] = useState(null); 
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -59,12 +60,15 @@ export default function App() {
     return <StudyGroups onBack={() => setScreen('home')} />;
   }
 
-    if (screen === 'events') {
+  if (screen === 'events') {
     return (
       <Events
         onBack={() => setScreen('home')}
         onGoToAddEvent={() => setScreen('add-event')}
-        onOpenEventDetails={() => setScreen('event-details')}
+        onOpenEventDetails={(item) => {
+          setSelectedEvent(item);
+          setScreen('event-details');
+        }}
       />
     );
   }
@@ -78,8 +82,13 @@ export default function App() {
   }
 
   if (screen === 'event-details') {
-  return <EventDetails onBack={() => setScreen('events')} />;
-}
+    return (
+      <EventDetails
+        onBack={() => setScreen('events')}
+        event={selectedEvent} 
+      />
+    );
+  }
 
   return null;
 }
