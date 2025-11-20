@@ -17,8 +17,8 @@ async function run() {
   try {
     const payload = {
       createdAt: new Date().toISOString(),
-      note: 'Badger Burrow CLI test write',
-      serverTime: serverTimestamp(),
+      note: 'Badger Burrow database test write',
+      createdAt: new Date(),
     };
 
     const docRef = await addDoc(collection(db, 'testWrites'), payload);

@@ -23,13 +23,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { auth, db } from '../../firebase';
-import {
-  collection,
-  onSnapshot,
-  query,
-  where,
-  orderBy,
-} from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
   const [activeTab, setActiveTab] = useState('recent');
@@ -48,13 +42,7 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
   }, []);
 
   useEffect(() => {
-    const now = new Date();
-
-    const q = query(
-      collection(db, 'events'),
-      where('startDateTime', '>=', now),
-      orderBy('startDateTime', 'asc')
-    );
+    const q = query(collection(db, 'events'), orderBy('startDateTime', 'asc'));
 
     const unsub = onSnapshot(q, (snap) => {
       const list = [];
@@ -81,6 +69,13 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
     });
   }, [search, events]);
 
+  const getStartTime = (event) => {
+    if (event.startDateTime && typeof event.startDateTime.toDate === 'function') {
+      return event.startDateTime.toDate().getTime();
+    }
+    return 0;
+  };
+
   const displayedEvents = useMemo(() => {
     if (activeTab === 'popular') {
       return [...filteredEvents].sort(
@@ -99,6 +94,23 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
       return filteredEvents.filter(
         (e) => Array.isArray(e.likedBy) && e.likedBy.includes(uid)
       );
+    }
+
+    if (activeTab === 'recent') {
+      const now = Date.now();
+      const upcoming = [];
+      const past = [];
+
+      filteredEvents.forEach((event) => {
+        const start = getStartTime(event);
+        if (!start || start >= now) {
+          upcoming.push(event);
+        } else {
+          past.push(event);
+        }
+      });
+
+      return [...upcoming, ...past];
     }
 
     return filteredEvents;
