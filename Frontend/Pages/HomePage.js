@@ -1,47 +1,123 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  StatusBar,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { collection, getCountFromServer } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 const buttons = [
-  { label: 'Listings', route: 'listings' },
-  { label: 'Study Groups', route: 'study-groups' },
-  { label: 'Events', route: 'events' },
+  { label: 'Listings', route: 'listings', copy: 'Discover campus deals.' },
+  { label: 'Study Groups', route: 'study-groups', copy: 'Meet classmates and collaborate.' },
+  { label: 'Events', route: 'events', copy: 'Never miss what is happening.' },
 ];
 
 export default function HomePage({ onNavigate }) {
+  const [eventCount, setEventCount] = useState(null);
+  const [userCount, setUserCount] = useState(null);
+  const [loadingCounts, setLoadingCounts] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchCounts() {
+      try {
+        const [eventSnap, userSnap] = await Promise.all([
+          getCountFromServer(collection(db, 'events')),
+          getCountFromServer(collection(db, 'users')),
+        ]);
+
+        if (!isMounted) return;
+        setEventCount(eventSnap.data().count);
+        setUserCount(userSnap.data().count);
+      } catch (err) {
+        console.log('Failed to fetch dashboard counts:', err);
+        if (isMounted) {
+          setEventCount(0);
+          setUserCount(0);
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingCounts(false);
+        }
+      }
+    }
+
+    fetchCounts();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const renderStatValue = (value) =>
+    loadingCounts || value === null ? '—' : value.toString();
+
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+
       <Image
         source={require('../../assets/Badger.png')}
         style={styles.mascot}
       />
-      <View style={styles.top}>
-        <View style={styles.header}>
+
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.brandLabel}>Welcome back to</Text>
+          <Text style={styles.title}>Badger Burrow</Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.accountButton}
+          onPress={() => onNavigate('account')}
+        >
+          <Text style={styles.accountText}>👤</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.hero}>
+        <Text style={styles.heroTagline}>Connect. Study. Trade. Thrive.</Text>
+        <Text style={styles.heroBody}>
+          Discover the latest listings, find a study squad, or drop into a
+          campus event—all curated for UW Badgers.
+        </Text>
+
+        <View style={styles.heroStats}>
+          <View style={styles.statBubble}>
+            <Text style={styles.statValue}>
+              {renderStatValue(eventCount)}
+            </Text>
+            <Text style={styles.statLabel}>Weekly meetups</Text>
+          </View>
+          <View style={styles.statBubble}>
+            <Text style={styles.statValue}>
+              {renderStatValue(userCount)}
+            </Text>
+            <Text style={styles.statLabel}>Active students</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.grid}>
+        {buttons.map((button) => (
           <TouchableOpacity
-            style={styles.accountButton}
-            onPress={() => onNavigate('account')}
+            key={button.route}
+            style={styles.card}
+            onPress={() => onNavigate(button.route)}
           >
-            <Text style={styles.accountText}>👤</Text>
+            <Text style={styles.cardLabel}>{button.label}</Text>
+            <Text style={styles.cardCopy}>{button.copy}</Text>
+            <Text style={styles.cardArrow}>→</Text>
           </TouchableOpacity>
-        </View>
-
-        <Text style={styles.title}>Badger Burrow</Text>
-        <Text style={styles.tagline}>Connect. Study. Trade. Thrive.</Text>
+        ))}
       </View>
 
-      <View style={styles.actionsWrapper}>
-        <View style={styles.actions}>
-          {buttons.map((button, index) => (
-            <TouchableOpacity
-              key={button.route}
-              style={[styles.button, index !== 0 && styles.buttonSpacing]}
-              onPress={() => onNavigate(button.route)}
-            >
-              <Text style={styles.buttonText}>{button.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+      <View style={styles.bottomSpacer} />
+
     </SafeAreaView>
   );
 }
@@ -49,18 +125,23 @@ export default function HomePage({ onNavigate }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#636c7a',
+    backgroundColor: '#f1f3f6',
     paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 24,
+    paddingTop: 28,
+    paddingBottom: 32,
   },
-  top: {
-    paddingBottom: 24,
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 28,
   },
-  header: {
-    width: '100%',
-    alignItems: 'flex-end',
-    marginBottom: 16,
+  brandLabel: {
+    textTransform: 'uppercase',
+    fontSize: 12,
+    color: '#a53c3c',
+    letterSpacing: 1,
+    marginBottom: 4,
   },
   accountButton: {
     width: 44,
@@ -76,37 +157,95 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   title: {
-    fontSize: 32,
+    fontSize: 34,
+    fontWeight: '800',
+    color: '#2b1b1b',
+  },
+  hero: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 36,
+    shadowColor: '#14213d',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  heroTagline: {
+    fontSize: 20,
     fontWeight: '700',
+    color: '#c5050c',
+    marginBottom: 8,
     textAlign: 'center',
   },
-  tagline: {
-    fontSize: 16,
-    color: '#636c7a',
+  heroBody: {
+    fontSize: 15,
+    color: '#444',
     textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 32,
+    marginBottom: 16,
   },
-  actionsWrapper: {
+  heroStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statBubble: {
     flex: 1,
-    justifyContent: 'center',
+    marginHorizontal: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#d9e2ec',
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
   },
-  actions: {
+  statValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#7b0c0c',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6c6c6c',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  grid: {
     width: '100%',
   },
-  button: {
-    backgroundColor: '#c5050c',
-    paddingVertical: 16,
-    borderRadius: 12,
+  card: {
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    minHeight: 90,
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  buttonSpacing: {
+  cardLabel: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#2b1b1b',
+  },
+  cardCopy: {
+    fontSize: 13,
+    color: '#686868',
+    marginTop: 6,
+  },
+  cardArrow: {
+    fontSize: 22,
+    color: '#c5050c',
     marginTop: 16,
+    alignSelf: 'flex-end',
   },
-  buttonText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '600',
+  bottomSpacer: {
+    flex: 1,
   },
   mascot: {
     position: 'absolute',

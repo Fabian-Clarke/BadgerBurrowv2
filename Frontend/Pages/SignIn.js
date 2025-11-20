@@ -33,12 +33,30 @@ export default function SignIn({ onGoToSignUp }) {
 
   return (
     <SafeAreaView style={styles.container}>
-    <Image
-      source={require('../../assets/Badger.png')}
-      style={styles.badger}
-    />
+      <StatusBar style="dark" />
+
+      <Image
+        source={require('../../assets/Badger.png')}
+        style={styles.badger}
+      />
+
+      <View style={styles.hero}>
+        <Text style={styles.heroBadge}>UW BADGER COMMUNITY</Text>
+        <Text style={styles.heroTitle}>Badger Burrow</Text>
+        <Text style={styles.heroSubtitle}>
+          Connect. Study. Trade. Thrive. Your campus hub now feels as bright as
+          Bascom at sunrise.
+        </Text>
+
+        <View style={styles.heroPills}>
+          <Text style={styles.pill}>Listings</Text>
+          <Text style={styles.pill}>Study Groups</Text>
+          <Text style={styles.pill}>Events</Text>
+        </View>
+      </View>
+
       <View style={styles.card}>
-        <Text style={styles.title}>Sign In</Text>
+        <Text style={styles.title}>Welcome back!</Text>
         <Text style={styles.subtitle}>Sign in to continue.</Text>
 
         <TextInput
@@ -82,13 +100,14 @@ export default function SignIn({ onGoToSignUp }) {
           </Text>
         </TouchableOpacity>
       </View>
-
       <View style={styles.branding}>
         <Text style={styles.tagline}>Connect. Study. Trade. Thrive.</Text>
-        <Text style={styles.brand}>BADGER BURROW</Text>
+        <Text style={styles.brand}>Badger Burrow</Text>
+        <Text style={styles.desc}>
+          Built by Badgers, for Badgers—stay plugged into campus life with a
+          single tap.
+        </Text>
       </View>
-
-      <StatusBar style="dark" />
     </SafeAreaView>
   );
 }
@@ -96,9 +115,55 @@ export default function SignIn({ onGoToSignUp }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#c5050c',
+    backgroundColor: '#fdf4f4',
     justifyContent: 'center',
     paddingHorizontal: 24,
+    paddingBottom: 16,
+  },
+  hero: {
+    marginTop: 16,
+    marginBottom: 20,
+    backgroundColor: '#fff',
+    borderRadius: 28,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  heroBadge: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#c5050c',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#291616',
+  },
+  heroSubtitle: {
+    fontSize: 15,
+    color: '#4d4d4d',
+    marginTop: 8,
+  },
+  heroPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 14,
+    gap: 8,
+  },
+  pill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#fff2f2',
+    borderWidth: 1,
+    borderColor: '#f3c9c9',
+    color: '#7d0b0b',
+    fontWeight: '600',
   },
   card: {
     backgroundColor: '#ffffff',
@@ -109,6 +174,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 4,
+    marginBottom: 20,
   },
   title: {
     fontSize: 26,
@@ -178,18 +244,27 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   branding: {
-    marginTop: 40,
+    marginTop: 'auto',
     alignItems: 'center',
+    paddingVertical: 20,
   },
   tagline: {
-    fontSize: 15,
-    color: '#555',
+    fontSize: 16,
+    color: '#c5050c',
     marginBottom: 4,
+    fontWeight: '700',
   },
   brand: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
+    color: '#2b1b1b',
+  },
+  desc: {
+    marginTop: 6,
+    fontSize: 14,
+    color: '#555',
+    textAlign: 'center',
   },
   badger: {
     position: 'absolute',
