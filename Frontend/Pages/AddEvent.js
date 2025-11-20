@@ -21,7 +21,6 @@ export default function AddEvent({ onBack }) {
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [price, setPrice] = useState('');
-  const [contact, setContact] = useState('');
   const [tags, setTags] = useState('');
   const [date, setDate] = useState(new Date());
   const [time, setTime] = useState(new Date());
@@ -80,11 +79,6 @@ export default function AddEvent({ onBack }) {
       setError('Please enter a price.');
       return;
     }
-    if (!contact.trim()) {
-      setError('Please enter a contact method.');
-      return;
-    }
-
     if (!auth.currentUser) {
       setError('You must be signed in to create an event.');
       return;
@@ -137,7 +131,7 @@ export default function AddEvent({ onBack }) {
       description: description.trim(),
       location: location.trim(),
       price: price.trim(),
-      contact: contact.trim(),
+      contact: auth.currentUser.email || '',
       tags: tagsArray,
       startDateTime: Timestamp.fromDate(eventDateTime),
       createdAt: serverTimestamp(),
@@ -268,20 +262,6 @@ export default function AddEvent({ onBack }) {
             placeholderTextColor="#9aa0ad"
             value={price}
             onChangeText={setPrice}
-          />
-        </View>
-
-        {/* Contact */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>
-            Contact Info <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g., badgerevents@wisc.edu"
-            placeholderTextColor="#9aa0ad"
-            value={contact}
-            onChangeText={setContact}
           />
         </View>
 
