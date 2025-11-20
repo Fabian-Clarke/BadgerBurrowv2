@@ -6,7 +6,8 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
 } from 'firebase/auth';
-import { auth } from '../../firebase';
+import { auth, db } from '../../firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function SignUp({ onGoToSignIn }) {
   const [name, setName] = useState('');
@@ -36,6 +37,13 @@ export default function SignUp({ onGoToSignIn }) {
       if (name) {
         await updateProfile(cred.user, { displayName: name });
       }
+
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        uid: cred.user.uid,
+        email: cred.user.email,
+        displayName: name || cred.user.displayName || '',
+        createdAt: serverTimestamp(),
+      });
 
       setMessage(`Welcome aboard, ${name || cred.user.email}!`);
       setMessageType('success');
