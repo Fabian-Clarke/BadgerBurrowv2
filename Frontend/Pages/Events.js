@@ -1,4 +1,16 @@
-import React, { useState } from 'react';
+export let justCreatedEventFlag = false;
+
+export function markEventCreatedFlag() {
+  justCreatedEventFlag = true;
+}
+
+export function consumeEventCreatedFlag() {
+  const current = justCreatedEventFlag;
+  justCreatedEventFlag = false;
+  return current;
+}
+
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,22 +22,90 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { auth, db } from '../../firebase';
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  orderBy,
+} from 'firebase/firestore';
+
 export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
   const [activeTab, setActiveTab] = useState('recent');
   const [search, setSearch] = useState('');
+  const [events, setEvents] = useState([]);
+  const [showCreatedMessage, setShowCreatedMessage] = useState(false);
 
-  // Dummy event data for now
-  const events = [
-    { id: 1, title: 'Witte Soccer Adventure', date: 'Nov 20, 2025', time: '3:30pm - 4:00pm' },
-    { id: 2, title: 'Bascom Flamingo Attack', date: 'Nov 22, 2025', time: '8:15am - 9:15am' },
-    { id: 3, title: 'Event', date: 'Date', time: 'Time' },
-    { id: 4, title: 'Event', date: 'Date', time: 'Time' },
-  ];
+  const user = auth.currentUser;
+
+  useEffect(() => {
+    if (consumeEventCreatedFlag()) {
+      setShowCreatedMessage(true);
+      const timer = setTimeout(() => setShowCreatedMessage(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  useEffect(() => {
+    const now = new Date();
+
+    const q = query(
+      collection(db, 'events'),
+      where('startDateTime', '>=', now),
+      orderBy('startDateTime', 'asc')
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      const list = [];
+      snap.forEach((doc) => {
+        list.push({
+          id: doc.id,
+          ...doc.data(),
+        });
+      });
+      setEvents(list);
+    });
+
+    return () => unsub();
+  }, []);
+
+  const filteredEvents = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    if (!s) return events;
+
+    return events.filter((e) => {
+      const title = (e.title || '').toLowerCase();
+      const loc = (e.location || '').toLowerCase();
+      return title.includes(s) || loc.includes(s);
+    });
+  }, [search, events]);
+
+  const displayedEvents = useMemo(() => {
+    if (activeTab === 'popular') {
+      return [...filteredEvents].sort(
+        (a, b) => (b.likesCount || 0) - (a.likesCount || 0)
+      );
+    }
+
+    if (activeTab === 'mine') {
+      const uid = user ? user.uid : null;
+      return filteredEvents.filter((e) => e.createdBy === uid);
+    }
+
+    if (activeTab === 'liked') {
+      const uid = user ? user.uid : null;
+      if (!uid) return [];
+      return filteredEvents.filter(
+        (e) => Array.isArray(e.likedBy) && e.likedBy.includes(uid)
+      );
+    }
+
+    return filteredEvents;
+  }, [filteredEvents, activeTab, user]);
 
   return (
     <SafeAreaView style={styles.container}>
-
-      {/* Background mascot like Listings */}
       <Image
         source={require('../../assets/Badger.png')}
         style={styles.mascot}
@@ -59,6 +139,11 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
           active={activeTab === 'mine'}
           onPress={() => setActiveTab('mine')}
         />
+        <TabChip
+          label="Liked"
+          active={activeTab === 'liked'}
+          onPress={() => setActiveTab('liked')}
+        />
       </View>
 
       {/* Search Bar with Search Button */}
@@ -77,22 +162,52 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
       </View>
 
       {/* Events List */}
-      <ScrollView style={styles.listArea} contentContainerStyle={{ paddingBottom: 80 }}>
-        {events.map(item => (
-          <View key={item.id} style={styles.card}>
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardTime}>
-              {item.date} • {item.time}
-            </Text>
+      <ScrollView
+        style={styles.listArea}
+        contentContainerStyle={{ paddingBottom: 80 }}
+      >
+        {/* Success message ABOVE the list (Option C) */}
+        {showCreatedMessage && (
+          <Text style={styles.cardTime}>Event created successfully 🎉</Text>
+        )}
 
-            <TouchableOpacity
-              style={styles.moreInfoButton}
-              onPress={onOpenEventDetails}
-            >
-              <Text style={styles.moreInfoText}>MORE INFO</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
+        {displayedEvents.length === 0 ? (
+          <Text style={styles.cardTime}>No events yet.</Text>
+        ) : (
+          displayedEvents.map((item) => {
+            // Format date/time from Firestore Timestamp
+            let dateStr = 'Date';
+            let timeStr = 'Time';
+            if (item.startDateTime && item.startDateTime.toDate) {
+              const d = item.startDateTime.toDate();
+              dateStr = d.toLocaleDateString();
+              timeStr = d.toLocaleTimeString([], {
+                hour: 'numeric',
+                minute: '2-digit',
+              });
+            }
+
+            return (
+              <View key={item.id} style={styles.card}>
+                <Text style={styles.cardTitle}>{item.title}</Text>
+                <Text style={styles.cardTime}>
+                  {dateStr} • {timeStr}
+                </Text>
+                <Text style={styles.cardLikes}>
+                  {(item.likesCount || 0)}{' '}
+                  {(item.likesCount || 0) === 1 ? 'like' : 'likes'}
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.moreInfoButton}
+                  onPress={() => onOpenEventDetails(item)}
+                >
+                  <Text style={styles.moreInfoText}>MORE INFO</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })
+        )}
       </ScrollView>
 
       {/* New Event Button (center bottom) */}
@@ -102,7 +217,7 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
       >
         <Text style={styles.newEventText}>＋ New Event</Text>
       </TouchableOpacity>
-      </SafeAreaView>
+    </SafeAreaView>
   );
 }
 
@@ -195,9 +310,15 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 
-  searchInput: {
-    marginTop: 4,
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
+    marginTop: 4,
+  },
+
+  searchInput: {
+    flex: 1,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#d0d5de',
@@ -205,6 +326,22 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
     backgroundColor: '#fff',
+    marginRight: 8,
+  },
+
+  searchButton: {
+    backgroundColor: '#c5050c',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  searchButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
   },
 
   listArea: {
@@ -240,6 +377,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  cardLikes: {
+    fontSize: 13,
+    color: '#777',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+
   moreInfoButton: {
     backgroundColor: '#c5050c',
     paddingVertical: 8,
@@ -268,38 +412,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
   },
-
-  searchRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  marginBottom: 12,
-  marginTop: 4,
-},
-
-searchInput: {
-  flex: 1,
-  borderRadius: 12,
-  borderWidth: 1,
-  borderColor: '#d0d5de',
-  paddingHorizontal: 12,
-  paddingVertical: 10,
-  fontSize: 14,
-  backgroundColor: '#fff',
-  marginRight: 8,
-},
-
-searchButton: {
-  backgroundColor: '#c5050c',
-  paddingVertical: 10,
-  paddingHorizontal: 16,
-  borderRadius: 10,
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-
-searchButtonText: {
-  color: '#fff',
-  fontWeight: '700',
-  fontSize: 13,
-},
 });

@@ -10,18 +10,26 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+import * as ImagePicker from 'expo-image-picker';
+import { auth, db, storage } from '../../firebase';
+import { addDoc, collection, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { markEventCreatedFlag } from './Events';
+
 export default function AddEvent({ onBack }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [date, setDate] = useState(new Date());
-  const [time, setTime] = useState(new Date());
   const [location, setLocation] = useState('');
   const [price, setPrice] = useState('');
   const [contact, setContact] = useState('');
   const [tags, setTags] = useState('');
-
+  const [date, setDate] = useState(new Date());
+  const [time, setTime] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+
+  const [imageUri, setImageUri] = useState(null);
+  const [error, setError] = useState('');
 
   const formattedDate = date.toLocaleDateString();
   const formattedTime = time.toLocaleTimeString([], {
@@ -29,7 +37,118 @@ export default function AddEvent({ onBack }) {
     minute: '2-digit',
   });
 
-  const [error, setError] = useState('');
+  const handlePickImage = async () => {
+    try {
+      // Ask for permission
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        setError('Permission is required to choose an image.');
+        return;
+      }
+
+      // Open image library
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUri(result.assets[0].uri);
+        setError('');
+      }
+    } catch (err) {
+      setError('Something went wrong while picking the image.');
+    }
+  };
+
+  const handleCreateEvent = async () => {
+    if (!title.trim()) {
+      setError('Please enter a title.');
+      return;
+    }
+    if (!description.trim()) {
+      setError('Please enter a short description.');
+      return;
+    }
+    if (!location.trim()) {
+      setError('Please enter a location.');
+      return;
+    }
+    if (!price.trim()) {
+      setError('Please enter a price.');
+      return;
+    }
+    if (!contact.trim()) {
+      setError('Please enter a contact method.');
+      return;
+    }
+
+    if (!auth.currentUser) {
+      setError('You must be signed in to create an event.');
+      return;
+    }
+    setError('');
+
+    const eventDateTime = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      time.getHours(),
+      time.getMinutes(),
+      0,
+      0
+    );
+
+    const tagsArray = tags
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+
+    let imageUrl = null;
+
+    if (imageUri) {
+      try {
+        console.log('📤 Uploading image to Firebase Storage');
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+
+        const fileName = `${auth.currentUser.uid}_${Date.now()}.jpg`;
+        const imageRef = ref(storage, `events/${fileName}`);
+
+        await uploadBytes(imageRef, blob);
+        imageUrl = await getDownloadURL(imageRef);
+        console.log('✅ Image uploaded, URL:', imageUrl);
+      } catch (err) {
+        console.log('🔥 Error uploading image:', err);
+        console.log('🔥 Error message:', err.message);
+        console.log('🔥 Error full:', JSON.stringify(err));
+      }
+    }
+    markEventCreatedFlag();
+
+    if (onBack) {
+      onBack();
+    }
+
+    addDoc(collection(db, 'events'), {
+      title: title.trim(),
+      description: description.trim(),
+      location: location.trim(),
+      price: price.trim(),
+      contact: contact.trim(),
+      tags: tagsArray,
+      startDateTime: Timestamp.fromDate(eventDateTime),
+      createdAt: serverTimestamp(),
+      createdBy: auth.currentUser.uid,
+      likesCount: 0,
+      likedBy: [],
+      imageUrl: imageUrl || null, // will be null if no image
+    }).catch((err) => {
+      console.log('Error from addDoc (background):', err);
+    });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -47,61 +166,71 @@ export default function AddEvent({ onBack }) {
 
       <ScrollView
         style={styles.form}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
         keyboardShouldPersistTaps="handled"
       >
-        {/* REQUIRED FIELDS -------------------------------------- */}
         {/* Title */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>
-            Title <Text style={styles.required}>*</Text>
+            Event Title <Text style={styles.required}>*</Text>
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="Witte Soccer Adventure"
+            placeholder="e.g., Badger Basketball Tournament"
+            placeholderTextColor="#9aa0ad"
             value={title}
             onChangeText={setTitle}
-            placeholderTextColor="#9aa0ad"
           />
         </View>
 
-        {/* Short Description */}
+        {/* Description */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>
             Short Description <Text style={styles.required}>*</Text>
           </Text>
           <TextInput
             style={[styles.input, styles.multilineInput]}
-            placeholder="Brief details about the event..."
+            placeholder="Briefly describe the event..."
+            placeholderTextColor="#9aa0ad"
             value={description}
             onChangeText={setDescription}
-            placeholderTextColor="#9aa0ad"
             multiline
-            numberOfLines={4}
+          />
+        </View>
+
+        {/* Location */}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>
+            Location <Text style={styles.required}>*</Text>
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g., Kohl Center, Madison"
+            placeholderTextColor="#9aa0ad"
+            value={location}
+            onChangeText={setLocation}
           />
         </View>
 
         {/* Date & Time */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>
-            Date &amp; Time <Text style={styles.required}>*</Text>
+            Date & Time <Text style={styles.required}>*</Text>
           </Text>
 
           <View style={styles.dateTimeRow}>
             <TouchableOpacity
-              style={styles.pickerButton}
+              style={[styles.input, styles.dateTimeButton]}
               onPress={() => setShowDatePicker(true)}
             >
-              <Text style={styles.pickerLabel}>Date</Text>
-              <Text style={styles.pickerValue}>{formattedDate}</Text>
+              <Text style={styles.dateTimeText}>{formattedDate}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.pickerButton}
+              style={[styles.input, styles.dateTimeButton]}
               onPress={() => setShowTimePicker(true)}
             >
-              <Text style={styles.pickerLabel}>Time</Text>
-              <Text style={styles.pickerValue}>{formattedTime}</Text>
+              <Text style={styles.dateTimeText}>{formattedTime}</Text>
             </TouchableOpacity>
           </View>
 
@@ -109,7 +238,6 @@ export default function AddEvent({ onBack }) {
             <DateTimePicker
               value={date}
               mode="date"
-              display="default"
               onChange={(event, selectedDate) => {
                 setShowDatePicker(false);
                 if (selectedDate) setDate(selectedDate);
@@ -121,27 +249,12 @@ export default function AddEvent({ onBack }) {
             <DateTimePicker
               value={time}
               mode="time"
-              display="default"
               onChange={(event, selectedTime) => {
                 setShowTimePicker(false);
                 if (selectedTime) setTime(selectedTime);
               }}
             />
           )}
-        </View>
-
-        {/* Location */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>
-            Location <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Bascom Hill, Witte Field, Memorial Union…"
-            value={location}
-            onChangeText={setLocation}
-            placeholderTextColor="#9aa0ad"
-          />
         </View>
 
         {/* Price */}
@@ -151,74 +264,67 @@ export default function AddEvent({ onBack }) {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder='e.g. "Free" or "$5"'
+            placeholder="e.g., Free, $10 at door"
+            placeholderTextColor="#9aa0ad"
             value={price}
             onChangeText={setPrice}
-            placeholderTextColor="#9aa0ad"
           />
         </View>
 
         {/* Contact */}
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>
-            Contact <Text style={styles.required}>*</Text>
+            Contact Info <Text style={styles.required}>*</Text>
           </Text>
           <TextInput
             style={styles.input}
-            placeholder='Email, phone or handle (e.g. "john@wisc.edu" or "@badgerclub")'
+            placeholder="e.g., badgerevents@wisc.edu"
+            placeholderTextColor="#9aa0ad"
             value={contact}
             onChangeText={setContact}
-            placeholderTextColor="#9aa0ad"
           />
-        </View>
-
-        {/* OPTIONAL FIELDS -------------------------------------- */}
-        {/* Image / Flyer (UI only for now) */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Image / Flyer (optional)</Text>
-          <TouchableOpacity style={styles.imagePlaceholder}>
-            <Text style={styles.imagePlus}>＋</Text>
-            <Text style={styles.imageText}>Add Flyer Image</Text>
-            <Text style={styles.imageSubText}>PNG / JPG • up to 10MB</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Tags */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Tags (optional)</Text>
+          <Text style={styles.label}>Tags (comma-separated)</Text>
           <TextInput
             style={styles.input}
-            placeholder='e.g. "Sports, Social, Study Group"'
+            placeholder="e.g., sports, social, free food"
+            placeholderTextColor="#9aa0ad"
             value={tags}
             onChangeText={setTags}
-            placeholderTextColor="#9aa0ad"
           />
         </View>
 
-        <TouchableOpacity
-            style={styles.createButton}
-            onPress={() => {
-                // Validation checks:
-                if (!title.trim()) return setError('Please enter a title.');
-                if (!description.trim()) return setError('Please enter a short description.');
-                if (!location.trim()) return setError('Please enter a location.');
-                if (!price.trim()) return setError('Please enter a price.');
-                if (!contact.trim()) return setError('Please enter a contact method.');
+        {/* Event Image */}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Event Image</Text>
+          <TouchableOpacity
+            style={styles.imageUploadBox}
+            onPress={handlePickImage}
+          >
+            <Text style={styles.imageText}>
+              {imageUri ? 'Image selected ✅' : 'Tap to upload image'}
+            </Text>
+            <Text style={styles.imageSubText}>
+              {imageUri
+                ? 'This image will be attached to your event.'
+                : 'For now, events without an image use a default Badger image.'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-                // If everything is valid, clear error
-                setError('');
-
-                // For now, just go back
-                onBack();
-            }}
-            >
-            <Text style={styles.createButtonText}>Create Event</Text>
-            </TouchableOpacity>
         {/* Error message */}
-        {error !== '' && (
-        <Text style={styles.errorText}>{error}</Text>
-        )}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
+        {/* Create button */}
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={handleCreateEvent}
+        >
+          <Text style={styles.createButtonText}>Create Event</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -240,11 +346,11 @@ const styles = StyleSheet.create({
   },
 
   headerTextWrap: {
-    flexDirection: 'column',
+    flex: 1,
   },
 
   appTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '800',
     color: '#000',
   },
@@ -304,49 +410,31 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 
-  pickerButton: {
+  dateTimeButton: {
     flex: 1,
+    justifyContent: 'center',
+  },
+
+  dateTimeText: {
+    fontSize: 14,
+    color: '#111827',
+  },
+
+  imageUploadBox: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#d0d5de',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#fff',
-  },
-
-  pickerLabel: {
-    fontSize: 12,
-    color: '#636c7a',
-    marginBottom: 4,
-  },
-
-  pickerValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#222',
-  },
-
-  imagePlaceholder: {
     borderStyle: 'dashed',
-    borderWidth: 1.5,
-    borderColor: '#c5050c',
-    borderRadius: 16,
-    paddingVertical: 24,
+    borderColor: '#d0d5de',
+    paddingVertical: 20,
     paddingHorizontal: 12,
     alignItems: 'center',
     backgroundColor: '#fff',
   },
 
-  imagePlus: {
-    fontSize: 30,
-    color: '#c5050c',
-    marginBottom: 6,
-  },
-
   imageText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#c5050c',
+    color: '#222',
   },
 
   imageSubText: {
@@ -358,15 +446,15 @@ const styles = StyleSheet.create({
   createButton: {
     marginTop: 8,
     backgroundColor: '#c5050c',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
+    borderRadius: 24,
+    paddingVertical: 12,
   },
 
   createButtonText: {
     color: '#fff',
     fontWeight: '700',
     fontSize: 16,
+    textAlign: 'center',
   },
 
   errorText: {
@@ -376,5 +464,4 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
   },
-
 });
