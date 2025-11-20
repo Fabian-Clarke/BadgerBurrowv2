@@ -61,16 +61,12 @@ export default function SignIn({ onGoToSignUp }) {
           returnKeyType="done"
         />
 
-        {/* Remember me / Forgot password */}
+        {/* Remember me */}
         <View style={styles.row}>
           <View style={styles.rowLeft}>
             <Switch value={remember} onValueChange={setRemember} />
             <Text style={styles.rememberText}>Remember me</Text>
           </View>
-
-          <TouchableOpacity onPress={() => { /* TODO: reset flow */ }}>
-            <Text style={styles.linkSmall}>Forgot password?</Text>
-          </TouchableOpacity>
         </View>
 
         {message ? <Text style={styles.message}>{message}</Text> : null}
@@ -177,7 +173,8 @@ const styles = StyleSheet.create({
   },
   message: {
     textAlign: 'center',
-    color: '#636c7a',
+    color: '#c5050c',
+    fontWeight: '600',
     marginBottom: 8,
   },
   branding: {
@@ -204,4 +201,3 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
 });
-

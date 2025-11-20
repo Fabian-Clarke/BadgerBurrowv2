@@ -91,11 +91,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  backText: {
-    color: '#c5050c',
-    fontWeight: '600',
-    fontSize: 16,
-  },
   actions: {
     width: '100%',
   },
