@@ -8,6 +8,7 @@ import Events from './Frontend/Pages/Events';
 import Account from './Frontend/Pages/Account';
 import AddEvent from './Frontend/Pages/AddEvent';
 import EventDetails from './Frontend/Pages/EventDetails';
+import NewListing from './Frontend/Pages/NewListing';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 
@@ -38,7 +39,20 @@ export default function App() {
   }
 
   if (screen === 'listings') {
-    return <Listings onBack={() => setScreen('home')} />;
+    return (
+    <Listings 
+    onBack={() => setScreen('home')} 
+    onGoToNewListing={() => setScreen('new-listing')}
+    />
+    );
+  }
+
+  if (screen === 'new-listing') {
+    return (
+    <NewListing 
+    onBack={() => setScreen('listings')} 
+    />
+    );
   }
 
   if (screen === 'study-groups') {

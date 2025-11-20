@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
+  SafeAreaView,
   View,
   Text,
   StyleSheet,
@@ -7,50 +8,124 @@ import {
   TextInput,
   ScrollView,
   Image,
+  Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  onSnapshot,
+  collection,
+  query,
+  orderBy,
+  doc,
+  updateDoc,
+  deleteDoc,
+} from 'firebase/firestore';
+import { db, auth } from '../../firebase';
 
-
-export default function Listings({ navigation, onBack }) {
+export default function Listings({ onBack, onGoToNewListing }) {
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
+  const [listings, setListings] = useState([]);
 
-  // Dummy data for now – replace with real listings later
-  const listings = [
-    { id: 1, title: 'Exploring Biology', currentBid: '$25' },
-    { id: 2, title: 'Exploring Biology', currentBid: '$18' },
-    { id: 3, title: 'Exploring Biology', currentBid: '$32' },
-    { id: 4, title: 'Exploring Biology', currentBid: '$21' },
-    { id: 5, title: 'Exploring Biology', currentBid: '$27' },
-  ];
+  useEffect(() => {
+    const q = query(collection(db, 'listings'), orderBy('createdAt', 'desc'));
 
-  const filtered = listings.filter(l =>
-    l.title.toLowerCase().includes(search.toLowerCase())
-  );
+    const unsub = onSnapshot(q, (snapshot) => {
+      const items = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+      console.log('Fetched listings:', items);
+      setListings(items);
+    });
+
+    return () => unsub();
+  }, []);
+
+  const currentUser = auth.currentUser;
+  console.log('Current user in Listings:', currentUser?.uid);
+
+  const visibleListings = useMemo(() => {
+    let filtered = listings;
+
+    if (activeTab === 'mine' && currentUser) {
+      filtered = filtered.filter((l) => l.ownerId === currentUser.uid);
+    } else if (activeTab === 'top') {
+      filtered = [...filtered].sort(
+        (a, b) => (b.currentBid || 0) - (a.currentBid || 0)
+      );
+    }
+
+    if (search.trim()) {
+      const low = search.toLowerCase();
+      filtered = filtered.filter((l) =>
+        (l.title || '').toLowerCase().includes(low)
+      );
+    }
+
+    return filtered;
+  }, [listings, activeTab, search, currentUser]);
+
+  const handleBid = async (id, currentBid, startingPrice) => {
+    try {
+      const newBid = (currentBid != null ? currentBid : startingPrice || 0) + 1;
+      const ref = doc(db, 'listings', id);
+      await updateDoc(ref, { currentBid: newBid });
+    } catch (err) {
+      console.log('Error bidding: ', err);
+    }
+  };
+
+  const confirmDelete = (item) => {
+    const uid = currentUser?.uid;
+
+    if (!uid || uid !== item.ownerId) {
+      Alert.alert('Not allowed', 'You can only delete your own listings.');
+      return;
+    }
+
+    Alert.alert(
+      'Delete listing',
+      'Are you sure you want to delete this listing?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const ref = doc(db, 'listings', item.id);
+              await deleteDoc(ref);
+            } catch (err) {
+              console.log('Error deleting listing:', err);
+              Alert.alert('Error', 'Could not delete listing.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
+      <TouchableOpacity style={styles.backButton} onPress={onBack}>
+        <Text style={styles.backText}>← Back</Text>
+      </TouchableOpacity>
+
       <Image
         source={require('../../assets/Badger.png')}
         style={styles.mascot}
       />
 
-      <View style={styles.headerRow}>
-        <View style={styles.headerTextWrap}>
-          <Text style={styles.appTitle}>Badger Burrow</Text>
-          <Text style={styles.appSubtitle}>Connect. Study. Trade. Thrive.</Text>
-        </View>
-
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
+      <View style={styles.header}>
+        <Text style={styles.appTitle}>Listings</Text>
+        <Text style={styles.appSubtitle}>
+          Browse and bid on items from fellow Badgers.
+        </Text>
       </View>
 
       <TouchableOpacity
         style={styles.newListingButton}
-        onPress={() => {
-          // navigation.navigate('NewListing'); // hook this up later if needed
-        }}
+        onPress={onGoToNewListing}
       >
         <Text style={styles.newListingText}>New Listing</Text>
       </TouchableOpacity>
@@ -81,40 +156,72 @@ export default function Listings({ navigation, onBack }) {
         placeholderTextColor="#9aa0ad"
       />
 
-      <ScrollView style={styles.listArea} contentContainerStyle={{ paddingBottom: 24 }}>
-        {filtered.map(item => (
-          <View key={item.id} style={styles.card}>
-            <View style={styles.cardTextArea}>
+      <ScrollView
+        style={styles.listArea}
+        contentContainerStyle={{ paddingBottom: 24 }}
+      >
+        {visibleListings.map((item) => {
+          const isOwner =
+            currentUser && currentUser.uid === (item.ownerId || '');
+
+          return (
+            <View key={item.id} style={styles.card}>
               <Text style={styles.cardTitle}>{item.title}</Text>
+
+              {item.description ? (
+                <Text style={styles.cardDesc} numberOfLines={2}>
+                  {item.description}
+                </Text>
+              ) : null}
+
               <Text style={styles.cardBidLabel}>
-                Current Bid: <Text style={styles.cardBidValue}>{item.currentBid}</Text>
+                Current Bid:{' '}
+                <Text style={styles.cardBidValue}>
+                  $
+                  {item.currentBid != null
+                    ? item.currentBid
+                    : item.startingPrice || 0}
+                </Text>
               </Text>
-            </View>
 
-            {/* Right-side image mock – replace with book/photo later */}
-            <View style={styles.cardImageWrapper}>
-              <Image
-                source={require('../../assets/Badger.png')}
-                style={styles.cardImage}
-              />
-            </View>
+              <View style={styles.cardImageWrapper}>
+                <Image
+                  source={require('../../assets/Badger.png')}
+                  style={styles.cardImage}
+                />
+              </View>
 
-            <TouchableOpacity
-              style={styles.bidButton}
-              onPress={() => {
-                // navigation.navigate('BidDetails', { id: item.id });
-              }}
-            >
-              <Text style={styles.bidButtonText}>Bid Now</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
+              <View style={styles.cardBottomRow}>
+                <TouchableOpacity
+                  style={styles.bidButton}
+                  onPress={() =>
+                    handleBid(item.id, item.currentBid, item.startingPrice)
+                  }
+                >
+                  <Text style={styles.bidButtonText}>Bid Now</Text>
+                </TouchableOpacity>
+
+                {isOwner && (
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => confirmDelete(item)}
+                  >
+                    <Text style={styles.deleteText}>Delete</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          );
+        })}
+
+        {visibleListings.length === 0 && (
+          <Text style={styles.emptyText}>No listings match your filters.</Text>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-/* Small component for the three filter tabs */
 function TabChip({ label, active, onPress }) {
   return (
     <TouchableOpacity
@@ -134,62 +241,49 @@ const styles = StyleSheet.create({
     backgroundColor: '#f6f8fb',
     paddingHorizontal: 20,
   },
-
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 24,
-    paddingBottom: 16,
-    gap: 12,             // gives a little spacing between ← Back and the title text
-  },
-
   backButton: {
-    paddingRight: 8,     // expand touch area slightly
+    position: 'absolute',
+    top: 40,
+    right: 16,      
+    zIndex: 10,
+    padding: 8,
   },
-
   backText: {
-    color: '#c5050c',
-    fontWeight: '600',
     fontSize: 16,
+    fontWeight: '600',
+    color: '#c5050c',
   },
-
-  headerTextWrap: {
-    flexDirection: 'column',
+  header: {
+    paddingTop: 40,
+    paddingBottom: 10,
   },
-
   appTitle: {
     fontSize: 26,
     fontWeight: '800',
     color: '#000',
   },
-
   appSubtitle: {
     fontSize: 14,
     color: '#636c7a',
-    marginTop: 2,
+    marginTop: 4,
   },
-
   newListingButton: {
     backgroundColor: '#c5050c',
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
-
   newListingText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
-
   tabsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 10,
   },
-
   tabChip: {
     flex: 1,
     paddingVertical: 8,
@@ -200,30 +294,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
   },
-
   tabChipActive: {
     backgroundColor: '#c5050c',
   },
-
-  backText: {
-    color: '#c5050c',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-
   tabChipText: {
     fontSize: 13,
     fontWeight: '500',
     color: '#c5050c',
   },
-
   tabChipTextActive: {
     color: '#fff',
   },
-
   searchInput: {
     marginTop: 4,
-    marginBottom: 12,
+    marginBottom: 10,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#d0d5de',
@@ -232,11 +316,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     backgroundColor: '#fff',
   },
-
   listArea: {
     flex: 1,
   },
-
   card: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -247,28 +329,28 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
+    overflow: 'hidden',
   },
-
-  cardTextArea: {
-    marginRight: 96, // leave room for the image on the right
-  },
-
   cardTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
+    paddingRight: 90,
   },
-
+  cardDesc: {
+    fontSize: 13,
+    color: '#555',
+    marginBottom: 6,
+    paddingRight: 90,
+  },
   cardBidLabel: {
     fontSize: 14,
     color: '#555',
   },
-
   cardBidValue: {
     fontWeight: '700',
     color: '#c5050c',
   },
-
   cardImageWrapper: {
     position: 'absolute',
     right: 12,
@@ -279,29 +361,46 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#f0f2f7',
   },
-
   cardImage: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
     opacity: 0.9,
   },
-
-  bidButton: {
-    alignSelf: 'flex-end',
+  cardBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
     marginTop: 10,
+    gap: 8,
+  },
+  bidButton: {
     paddingVertical: 6,
     paddingHorizontal: 16,
     borderRadius: 20,
     backgroundColor: '#c5050c',
   },
-
   bidButtonText: {
     color: '#fff',
     fontSize: 13,
     fontWeight: '600',
   },
-
+  deleteButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: '#ffe5e5',
+  },
+  deleteText: {
+    color: '#c5050c',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#888',
+    marginTop: 20,
+  },
   mascot: {
     position: 'absolute',
     bottom: -20,
