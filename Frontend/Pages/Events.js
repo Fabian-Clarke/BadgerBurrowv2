@@ -60,24 +60,41 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
 
   const filteredEvents = useMemo(() => {
     const now = Date.now();
+    const s = search.trim().toLowerCase();
 
     const upcomingEvents = events.filter((e) => {
       if (e.startDateTime && typeof e.startDateTime.toDate === 'function') {
         const startTime = e.startDateTime.toDate().getTime();
-        return startTime >= now; // keep only today/future
+        return startTime >= now;
       }
       return true;
     });
 
-    const s = search.trim().toLowerCase();
     if (!s) return upcomingEvents;
 
     return upcomingEvents.filter((e) => {
       const title = (e.title || '').toLowerCase();
       const loc = (e.location || '').toLowerCase();
-      return title.includes(s) || loc.includes(s);
+      const desc = (e.description || '').toLowerCase();
+
+      let tagsText = '';
+      if (Array.isArray(e.tags)) {
+        tagsText = e.tags.join(' ').toLowerCase();
+      } else if (e.tags) {
+        tagsText = String(e.tags).toLowerCase();
+      } else if (e.tag) {
+        tagsText = String(e.tag).toLowerCase();
+      }
+
+      return (
+        title.includes(s) ||
+        loc.includes(s) ||
+        desc.includes(s) ||
+        tagsText.includes(s)
+      );
     });
   }, [search, events]);
+
 
   const getStartTime = (event) => {
     if (event.startDateTime && typeof event.startDateTime.toDate === 'function') {
