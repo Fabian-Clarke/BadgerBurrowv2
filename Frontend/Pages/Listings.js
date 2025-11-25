@@ -188,7 +188,11 @@ export default function Listings({ onBack, onGoToNewListing }) {
 
               <View style={styles.cardImageWrapper}>
                 <Image
-                  source={require('../../assets/Badger.png')}
+                  source={
+                    item.imageUrl
+                      ? { uri: item.imageUrl }
+                      : require('../../assets/Badger.png')
+                  }
                   style={styles.cardImage}
                 />
               </View>
