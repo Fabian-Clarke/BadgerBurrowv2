@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image,} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import * as ImagePicker from 'expo-image-picker';
 import {
   createUserWithEmailAndPassword,
   updateProfile,
 } from 'firebase/auth';
 import { auth, db } from '../../firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET } from '../../cloudinary';
 
 export default function SignUp({ onGoToSignIn }) {
   const [name, setName] = useState('');
@@ -17,9 +19,70 @@ export default function SignUp({ onGoToSignIn }) {
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState(null);
 
-  const handleSubmit = async () => {
+  const [imageUri, setImageUri] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+    // Upload image to Cloudinary
+  async function uploadImageToCloudinary(uri) {
+    const formData = new FormData();
+
+    formData.append('file', {
+      uri,
+      type: 'image/jpeg',
+      name: 'profile-image.jpg',
+    });
+
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'Cloudinary upload failed');
+    }
+
+    return data.secure_url;
+  }
+
+  const handlePickImage = async () => {
+    try {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        setMessage('Permission is required to choose a profile picture.');
+        setMessageType('error');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],     
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUri(result.assets[0].uri);
+        setMessage('');
+        setMessageType(null);
+      }
+    } catch (err) {
+      setMessage('Something went wrong while picking the image.');
+      setMessageType('error');
+    }
+  };
+
+    const handleSubmit = async () => {
     setMessage('');
     setMessageType(null);
+
     try {
       if (!name || !email || !password || !confirmPassword) {
         throw new Error('Please fill out every field.');
@@ -34,14 +97,34 @@ export default function SignUp({ onGoToSignIn }) {
         password
       );
 
-      if (name) {
-        await updateProfile(cred.user, { displayName: name });
+      // 1. If user selected an image, upload to Cloudinary
+      let profileImageUrl = null;
+      if (imageUri) {
+        try {
+          setUploading(true);
+          profileImageUrl = await uploadImageToCloudinary(imageUri);
+        } catch (err) {
+          console.log('Error uploading profile image:', err);
+        } finally {
+          setUploading(false);
+        }
       }
 
+      // 2. Update Firebase Auth profile (name + optional photo)
+      const profileUpdates = {};
+      if (name) profileUpdates.displayName = name;
+      if (profileImageUrl) profileUpdates.photoURL = profileImageUrl;
+
+      if (Object.keys(profileUpdates).length > 0) {
+        await updateProfile(cred.user, profileUpdates);
+      }
+
+      // 3. Save user document in Firestore
       await setDoc(doc(db, 'users', cred.user.uid), {
         uid: cred.user.uid,
         email: cred.user.email,
         displayName: name || cred.user.displayName || '',
+        profileImageUrl: profileImageUrl || null, // <-- key we’ll use later
         createdAt: serverTimestamp(),
       });
 
@@ -107,6 +190,25 @@ export default function SignUp({ onGoToSignIn }) {
           autoCapitalize="none"
           returnKeyType="done"
         />
+
+                <TouchableOpacity
+          style={styles.imageUploadBox}
+          onPress={handlePickImage}
+          disabled={uploading}
+        >
+          <Text style={styles.imageText}>
+            {imageUri
+              ? 'Profile picture selected ✅'
+              : 'Add an optional profile picture'}
+          </Text>
+          <Text style={styles.imageSubText}>
+            {uploading
+              ? 'Uploading...'
+              : imageUri
+              ? 'This photo will appear on your profile.'
+              : 'You can leave this empty to use the default image.'}
+          </Text>
+        </TouchableOpacity>
 
         {message ? (
           <Text
@@ -263,5 +365,28 @@ const styles = StyleSheet.create({
     height: 200,
     opacity: 0.16, 
     zIndex: -1,
+  },
+
+    imageUploadBox: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#d8dee6',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    marginBottom: 12,
+    backgroundColor: '#fafafa',
+  },
+
+  imageText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000',
+  },
+
+  imageSubText: {
+    fontSize: 12,
+    color: '#555',
+    marginTop: 4,
   },
 });
