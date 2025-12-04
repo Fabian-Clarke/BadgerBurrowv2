@@ -251,7 +251,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  
   groupsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -294,7 +293,6 @@ const styles = StyleSheet.create({
     color: '#fff',                   
     fontWeight: '600',
   },
-
 
   joinButton: {
     marginTop: 10,

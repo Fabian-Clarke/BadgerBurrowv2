@@ -1,3 +1,20 @@
+import React, { useEffect, useMemo, useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  TextInput,
+  Alert,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { auth, db } from '../../firebase';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+
+// --- simple flag for "event created" toast; NO hooks here ---
 export let justCreatedEventFlag = false;
 
 export function markEventCreatedFlag() {
@@ -10,29 +27,19 @@ export function consumeEventCreatedFlag() {
   return current;
 }
 
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  TextInput,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { auth, db } from '../../firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-
 export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
+  // ---- hooks: ALWAYS in this order, no conditionals above them ----
   const [activeTab, setActiveTab] = useState('recent');
   const [search, setSearch] = useState('');
   const [events, setEvents] = useState([]);
   const [showCreatedMessage, setShowCreatedMessage] = useState(false);
 
+  // which events we already notified about
+  const notifiedEventsRef = useRef(new Set());
+
   const user = auth.currentUser;
 
+  // show “event created successfully” message when we come back from AddEvent
   useEffect(() => {
     if (consumeEventCreatedFlag()) {
       setShowCreatedMessage(true);
@@ -41,23 +48,20 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
     }
   }, []);
 
+  // subscribe to events collection
   useEffect(() => {
     const q = query(collection(db, 'events'), orderBy('startDateTime', 'asc'));
 
     const unsub = onSnapshot(q, (snap) => {
       const list = [];
-      snap.forEach((doc) => {
-        list.push({
-          id: doc.id,
-          ...doc.data(),
-        });
-      });
+      snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
       setEvents(list);
     });
 
     return () => unsub();
   }, []);
 
+  // text search
   const filteredEvents = useMemo(() => {
     const s = search.trim().toLowerCase();
     if (!s) return events;
@@ -69,13 +73,18 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
     });
   }, [search, events]);
 
+  // helper to get millis for sort/recent tabs (no hooks here)
   const getStartTime = (event) => {
-    if (event.startDateTime && typeof event.startDateTime.toDate === 'function') {
+    if (
+      event.startDateTime &&
+      typeof event.startDateTime.toDate === 'function'
+    ) {
       return event.startDateTime.toDate().getTime();
     }
     return 0;
   };
 
+  // apply tab filters: recent / popular / mine / liked
   const displayedEvents = useMemo(() => {
     if (activeTab === 'popular') {
       return [...filteredEvents].sort(
@@ -116,6 +125,57 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
     return filteredEvents;
   }, [filteredEvents, activeTab, user]);
 
+  // 🔔 notify when a liked event is starting soon
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid) return;
+
+    // For testing: you can set CHECK_INTERVAL_MS = 5000 and WINDOW_MS = 5 * 60 * 1000
+    const CHECK_INTERVAL_MS = 60 * 1000; // check every 60s
+    const WINDOW_MS = 15 * 60 * 1000; // 15 min window
+
+    const intervalId = setInterval(() => {
+      const now = Date.now();
+
+      displayedEvents.forEach((event) => {
+        if (
+          !event ||
+          !event.startDateTime ||
+          typeof event.startDateTime.toDate !== 'function'
+        ) {
+          return;
+        }
+
+        // only events this user liked
+        if (!Array.isArray(event.likedBy) || !event.likedBy.includes(uid)) {
+          return;
+        }
+
+        const start = event.startDateTime.toDate().getTime();
+        const delta = start - now;
+
+        if (delta >= 0 && delta <= WINDOW_MS) {
+          if (!notifiedEventsRef.current.has(event.id)) {
+            notifiedEventsRef.current.add(event.id);
+
+            const timeStr = new Date(start).toLocaleTimeString([], {
+              hour: 'numeric',
+              minute: '2-digit',
+            });
+
+            Alert.alert(
+              'Event starting soon 🎉',
+              `"${event.title}" starts at ${timeStr}.`
+            );
+          }
+        }
+      });
+    }, CHECK_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [displayedEvents, user]);
+
+  // ---- render ----
   return (
     <SafeAreaView style={styles.container}>
       <Image
@@ -158,7 +218,7 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
         />
       </View>
 
-      {/* Search Bar with Search Button */}
+      {/* Search */}
       <View style={styles.searchRow}>
         <TextInput
           style={styles.searchInput}
@@ -167,18 +227,16 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
           onChangeText={setSearch}
           placeholderTextColor="#9aa0ad"
         />
-
         <TouchableOpacity style={styles.searchButton}>
           <Text style={styles.searchButtonText}>SEARCH</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Events List */}
+      {/* Events list */}
       <ScrollView
         style={styles.listArea}
         contentContainerStyle={{ paddingBottom: 80 }}
       >
-        {/* Success message ABOVE the list (Option C) */}
         {showCreatedMessage && (
           <Text style={styles.cardTime}>Event created successfully 🎉</Text>
         )}
@@ -187,7 +245,6 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
           <Text style={styles.cardTime}>No events yet.</Text>
         ) : (
           displayedEvents.map((item) => {
-            // Format date/time from Firestore Timestamp
             let dateStr = 'Date';
             let timeStr = 'Time';
             if (item.startDateTime && item.startDateTime.toDate) {
@@ -222,7 +279,7 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
         )}
       </ScrollView>
 
-      {/* New Event Button (center bottom) */}
+      {/* New Event Button */}
       <TouchableOpacity
         style={styles.newEventButton}
         onPress={onGoToAddEvent}
@@ -252,7 +309,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f6f8fb',
     paddingHorizontal: 20,
   },
-
   mascot: {
     position: 'absolute',
     bottom: -20,
@@ -262,7 +318,6 @@ const styles = StyleSheet.create({
     opacity: 0.08,
     zIndex: -1,
   },
-
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -270,33 +325,27 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 16,
   },
-
   headerTextWrap: {
     flexDirection: 'column',
   },
-
   appTitle: {
     fontSize: 26,
     fontWeight: '800',
     color: '#000',
   },
-
   backButton: {
     paddingRight: 8,
   },
-
   backText: {
     color: '#c5050c',
     fontWeight: '600',
     fontSize: 16,
   },
-
   tabsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-
   tabChip: {
     flex: 1,
     paddingVertical: 8,
@@ -307,28 +356,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
   },
-
   tabChipActive: {
     backgroundColor: '#c5050c',
   },
-
   tabChipText: {
     fontSize: 13,
     fontWeight: '500',
     color: '#c5050c',
   },
-
   tabChipTextActive: {
     color: '#fff',
   },
-
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
     marginTop: 4,
   },
-
   searchInput: {
     flex: 1,
     borderRadius: 12,
@@ -340,7 +384,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginRight: 8,
   },
-
   searchButton: {
     backgroundColor: '#c5050c',
     paddingVertical: 10,
@@ -349,18 +392,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   searchButtonText: {
     color: '#fff',
     fontWeight: '700',
     fontSize: 13,
   },
-
   listArea: {
     flex: 1,
     marginTop: 4,
   },
-
   card: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -374,41 +414,35 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
-
   cardTitle: {
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 6,
   },
-
   cardTime: {
     fontSize: 14,
     color: '#555',
     marginBottom: 14,
     textAlign: 'center',
   },
-
   cardLikes: {
     fontSize: 13,
     color: '#777',
     marginBottom: 10,
     textAlign: 'center',
   },
-
   moreInfoButton: {
     backgroundColor: '#c5050c',
     paddingVertical: 8,
     paddingHorizontal: 22,
     borderRadius: 20,
   },
-
   moreInfoText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
   },
-
   newEventButton: {
     position: 'absolute',
     bottom: 20,
@@ -418,7 +452,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     borderRadius: 30,
   },
-
   newEventText: {
     color: '#fff',
     fontWeight: '700',
