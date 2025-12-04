@@ -9,12 +9,15 @@ import Account from './Frontend/Pages/Account';
 import AddEvent from './Frontend/Pages/AddEvent';
 import EventDetails from './Frontend/Pages/EventDetails';
 import NewListing from './Frontend/Pages/NewListing';
+import StudyGroupDetails from './Frontend/Pages/StudyGroupDetails';
+import CreateStudyGroup from './Frontend/Pages/CreateStudyGroup';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 
 export default function App() {
   const [screen, setScreen] = useState('loading');
   const [selectedEvent, setSelectedEvent] = useState(null); 
+  const [selectedGroup, setSelectedGroup] = useState(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -57,7 +60,30 @@ export default function App() {
   }
 
   if (screen === 'study-groups') {
-    return <StudyGroups onBack={() => setScreen('home')} />;
+    return (
+      <StudyGroups
+        onBack={() => setScreen('home')}
+        onNavigate={setScreen}
+        setSelectedGroup={setSelectedGroup}
+      />
+    );
+  }
+  
+  if (screen === 'study-group-details') {
+    return (
+      <StudyGroupDetails
+        onBack={() => setScreen('study-groups')}
+        group={selectedGroup}
+      />
+    );
+  }
+  
+  if (screen === 'create-study-group') {
+    return (
+      <CreateStudyGroup
+        onBack={() => setScreen('study-groups')}
+      />
+    );
   }
 
   if (screen === 'events') {

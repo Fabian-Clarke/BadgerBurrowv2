@@ -5,9 +5,48 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  View,
+  Image,
 } from 'react-native';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
+
+import * as ImagePicker from 'expo-image-picker';
+import {
+  CLOUDINARY_UPLOAD_PRESET,
+  CLOUDINARY_CLOUD_NAME,
+} from '../../cloudinary';
+
+// Upload image to Cloudinary using the URI from ImagePicker
+async function uploadImageToCloudinary(uri) {
+  const formData = new FormData();
+
+  formData.append('file', {
+    uri,
+    type: 'image/jpeg',
+    name: 'listing-image.jpg',
+  });
+
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    {
+      method: 'POST',
+      body: formData,
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.log('Cloudinary upload error payload:', data);
+    throw new Error(data.error?.message || 'Cloudinary upload failed');
+  }
+
+  return data.secure_url;
+}
+
 
 export default function NewListing({ onBack }) {
   const [title, setTitle] = useState('');
@@ -15,12 +54,44 @@ export default function NewListing({ onBack }) {
   const [startingPrice, setStartingPrice] = useState('');
   const [message, setMessage] = useState('');
 
-  const handleCreate = async () => {
+  const [imageUri, setImageUri] = useState(null);
+
+    const handlePickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        setMessage('Permission to access photos is required.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1], 
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUri(result.assets[0].uri);
+        setMessage('');
+      }
+    } catch (err) {
+      console.log('Error picking image:', err);
+      setMessage('Error picking image. Please try again.');
+    }
+  };
+
+    const handleCreate = async () => {
     console.log('Create Listing pressed');
 
     try {
       if (!title || !startingPrice) {
         setMessage('Title and starting price are required.');
+        return;
+      }
+
+      if (!imageUri) {
+        setMessage('A product image is required.');
         return;
       }
 
@@ -36,6 +107,17 @@ export default function NewListing({ onBack }) {
         return;
       }
 
+      // Upload image first
+      let imageUrl = null;
+      try {
+        imageUrl = await uploadImageToCloudinary(imageUri);
+        console.log('Listing image uploaded, URL:', imageUrl);
+      } catch (err) {
+        console.log('Error uploading listing image:', err);
+        setMessage('Error uploading image. Please try again.');
+        return;
+      }
+
       const docRef = await addDoc(collection(db, 'listings'), {
         title,
         description,
@@ -43,6 +125,7 @@ export default function NewListing({ onBack }) {
         currentBid: priceNumber,
         ownerId: user.uid,
         createdAt: serverTimestamp(),
+        imageUrl: imageUrl || null, // store in Firestore
       });
 
       console.log('Listing created with id:', docRef.id);
@@ -50,6 +133,7 @@ export default function NewListing({ onBack }) {
       setTitle('');
       setDescription('');
       setStartingPrice('');
+      setImageUri(null);
       setMessage('');
 
       if (typeof onBack === 'function') {
@@ -84,13 +168,26 @@ export default function NewListing({ onBack }) {
         multiline
       />
 
-      <TextInput
+            <TextInput
         style={styles.input}
         placeholder="Starting price"
         value={startingPrice}
         onChangeText={setStartingPrice}
         keyboardType="numeric"
       />
+
+      {/* Image picker + preview */}
+      <View style={styles.imageRow}>
+        <TouchableOpacity style={styles.imageButton} onPress={handlePickImage}>
+          <Text style={styles.imageButtonText}>
+            {imageUri ? 'Change Image' : 'Add Product Image'}
+          </Text>
+        </TouchableOpacity>
+
+        {imageUri && (
+          <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+        )}
+      </View>
 
       {message ? <Text style={styles.message}>{message}</Text> : null}
 
@@ -153,5 +250,29 @@ const styles = StyleSheet.create({
   message: {
     color: '#c5050c',
     marginBottom: 4,
+  },
+    imageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+    gap: 10,
+  },
+  imageButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: '#c5050c',
+  },
+  imageButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  imagePreview: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#eee',
   },
 });

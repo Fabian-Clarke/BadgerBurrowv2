@@ -11,9 +11,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import * as ImagePicker from 'expo-image-picker';
-import { auth, db, storage } from '../../firebase';
+import { auth, db } from '../../firebase';
+import { CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET } from '../../cloudinary';
 import { addDoc, collection, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { markEventCreatedFlag } from './Events';
 
 export default function AddEvent({ onBack }) {
@@ -29,6 +29,35 @@ export default function AddEvent({ onBack }) {
 
   const [imageUri, setImageUri] = useState(null);
   const [error, setError] = useState('');
+
+  // Upload image to Cloudinary using the URI from ImagePicker
+  async function uploadImageToCloudinary(uri) {
+    const formData = new FormData();
+
+    formData.append('file', {
+      uri,
+      type: 'image/jpeg',       
+      name: 'event-image.jpg',  
+    });
+
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'Cloudinary upload failed');
+    }
+
+    return data.secure_url;
+  }
 
   const formattedDate = date.toLocaleDateString();
   const formattedTime = time.toLocaleTimeString([], {
@@ -49,9 +78,10 @@ export default function AddEvent({ onBack }) {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
+        aspect: [3, 4],      
+        quality: 1,          
       });
+
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setImageUri(result.assets[0].uri);
@@ -104,22 +134,13 @@ export default function AddEvent({ onBack }) {
 
     if (imageUri) {
       try {
-        console.log('📤 Uploading image to Firebase Storage');
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-
-        const fileName = `${auth.currentUser.uid}_${Date.now()}.jpg`;
-        const imageRef = ref(storage, `events/${fileName}`);
-
-        await uploadBytes(imageRef, blob);
-        imageUrl = await getDownloadURL(imageRef);
-        console.log('✅ Image uploaded, URL:', imageUrl);
+        imageUrl = await uploadImageToCloudinary(imageUri);
       } catch (err) {
-        console.log('🔥 Error uploading image:', err);
-        console.log('🔥 Error message:', err.message);
-        console.log('🔥 Error full:', JSON.stringify(err));
+        console.log('Error uploading image to Cloudinary:', err);
+        console.log('Error message:', err.message);
       }
     }
+
     markEventCreatedFlag();
 
     if (onBack) {

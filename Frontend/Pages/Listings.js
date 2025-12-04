@@ -107,18 +107,15 @@ export default function Listings({ onBack, onGoToNewListing }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Back (top-right, red) */}
       <TouchableOpacity style={styles.backButton} onPress={onBack}>
         <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
 
-      {/* Bucky watermark */}
       <Image
         source={require('../../assets/Badger.png')}
         style={styles.mascot}
       />
 
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.appTitle}>Listings</Text>
         <Text style={styles.appSubtitle}>
@@ -165,7 +162,7 @@ export default function Listings({ onBack, onGoToNewListing }) {
       {/* List */}
       <ScrollView
         style={styles.listArea}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={styles.listContent}
       >
         {visibleListings.map((item) => {
           const isOwner =
@@ -197,7 +194,11 @@ export default function Listings({ onBack, onGoToNewListing }) {
               {/* Badger image on right */}
               <View style={styles.cardImageWrapper}>
                 <Image
-                  source={require('../../assets/Badger.png')}
+                  source={
+                    item.imageUrl
+                      ? { uri: item.imageUrl }
+                      : require('../../assets/Badger.png')
+                  }
                   style={styles.cardImage}
                 />
               </View>
@@ -264,8 +265,8 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 55,
-    right: 16,
+    top: 40,
+    right: 16,      
     zIndex: 10,
     padding: 8,
   },
@@ -274,12 +275,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#c5050c',
   },
-  header: {
-    paddingTop: 40,
-    paddingBottom: 10,
+  headerWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    paddingLeft: 10,
+    paddingRight: 10,
+    marginBottom: 18,
+    borderBottomWidth: 1,
+    borderColor: '#dde3ef',
+  },
+  headerText: {
+    flex: 1,
+    marginRight: 16,
+  },
+  headerBack: {
+    paddingVertical: 8,
+    paddingLeft: 16,
   },
   appTitle: {
-    fontSize: 26,
+    fontSize: 30,
     fontWeight: '800',
     color: '#000',
   },
@@ -287,13 +303,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#636c7a',
     marginTop: 4,
+    marginRight: 32,
   },
   newListingButton: {
     backgroundColor: '#c5050c',
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 18,
+    marginTop: 6,
   },
   newListingText: {
     color: '#fff',
@@ -303,7 +321,7 @@ const styles = StyleSheet.create({
   tabsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 18,
   },
   tabChip: {
     flex: 1,
@@ -327,8 +345,8 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   searchInput: {
-    marginTop: 4,
-    marginBottom: 10,
+    marginTop: 6,
+    marginBottom: 22,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#d0d5de',
@@ -340,11 +358,14 @@ const styles = StyleSheet.create({
   listArea: {
     flex: 1,
   },
+  listContent: {
+    paddingBottom: 40,
+  },
   card: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 12,
-    marginBottom: 14,
+    padding: 16,
+    marginBottom: 18,
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowRadius: 6,
@@ -374,10 +395,10 @@ const styles = StyleSheet.create({
   },
   cardImageWrapper: {
     position: 'absolute',
-    right: 12,
-    top: 12,
-    width: 72,
-    height: 72,
+    right: 14,
+    top: 14,
+    width: 70,
+    height: 70,
     borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: '#f0f2f7',

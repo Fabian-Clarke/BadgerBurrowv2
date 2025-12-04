@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,29 +9,78 @@ import {
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { db, auth } from '../../firebase';
+import {
+  collection,
+  onSnapshot,
+  doc,
+  updateDoc,
+  arrayUnion
+} from 'firebase/firestore';
 
-export default function StudyGroups({ onBack }) {
+export default function StudyGroups({ onBack, onNavigate, setSelectedGroup }) {
   const [search, setSearch] = useState('');
+  const [groups, setGroups] = useState([]);
 
+<<<<<<< HEAD
   const myStudyGroups = [
     { id: 1, name: 'CS 407 study group', members: 7 },
     { id: 2, name: 'CS 577 study group', members: 7 },
   ];
+=======
+  const uid = auth.currentUser?.uid;
+>>>>>>> 7dee5498dc75095ee3c27796685289e042e57760
 
-  const otherStudyGroups = [
-    { id: 3, name: 'CS 555 study group', members: 7 },
-    { id: 4, name: 'CS 320 study group', members: 7 },
-    { id: 5, name: 'MATH 340 study group', members: 5 },
-    { id: 6, name: 'ECON 101 study group', members: 3 },
-  ];
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'studyGroups'), (snap) => {
+      const list = [];
+      snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+      setGroups(list);
+    });
+    return unsub;
+  }, []);
+
+  const myStudyGroups = groups.filter((g) => g.members.includes(uid));
+  const otherStudyGroups = groups.filter((g) => !g.members.includes(uid));
+
+  //searching
+  const filterGroups = (arr) =>
+    arr.filter((g) =>
+      g.name.toLowerCase().includes(search.toLowerCase())
+    );
+
+  //this will join the group
+  const handleJoin = async (group) => {
+    try {
+      await updateDoc(doc(db, 'studyGroups', group.id), {
+        members: arrayUnion(uid),
+      });
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  //this will nav to the detail section
+  const openDetails = (group) => {
+    setSelectedGroup(group);
+    onNavigate('study-group-details');
+  };
 
   return (
     <SafeAreaView style={styles.container}>
+<<<<<<< HEAD
+=======
+      {/*trying to use mascot*/}
+>>>>>>> 7dee5498dc75095ee3c27796685289e042e57760
       <Image
         source={require('../../assets/Badger.png')}
         style={styles.mascot}
       />
 
+<<<<<<< HEAD
+=======
+      {/**/}
+>>>>>>> 7dee5498dc75095ee3c27796685289e042e57760
       <View style={styles.headerRow}>
         <View style={styles.headerTextWrap}>
           <Text style={styles.appTitle}>Badger Burrow</Text>
@@ -46,6 +95,7 @@ export default function StudyGroups({ onBack }) {
         style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}
       >
+<<<<<<< HEAD
         <Text style={styles.sectionTitle}>My Study Groups</Text>
 
         <View style={styles.groupsGrid}>
@@ -59,6 +109,9 @@ export default function StudyGroups({ onBack }) {
           ))}
         </View>
 
+=======
+        {/* search bar */}
+>>>>>>> 7dee5498dc75095ee3c27796685289e042e57760
         <View style={styles.searchRow}>
           <TextInput
             style={styles.searchInput}
@@ -72,19 +125,56 @@ export default function StudyGroups({ onBack }) {
           </TouchableOpacity>
         </View>
 
+<<<<<<< HEAD
+=======
+        {/* study grp */}
+        <Text style={styles.sectionTitle}>My Study Groups</Text>
+
+        <View style={styles.groupsGrid}>
+          {filterGroups(myStudyGroups).map(group => (
+            <TouchableOpacity
+              key={group.id}
+              style={styles.groupItem}
+              onPress={() => openDetails(group)}
+            >
+              <View style={styles.groupCircle}>
+                <Text style={styles.groupName}>{group.name}</Text>
+                <Text style={styles.groupCount}>
+                  {group.members.length}/{group.maxSeats}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Other */}
+>>>>>>> 7dee5498dc75095ee3c27796685289e042e57760
         <Text style={[styles.sectionTitle, { marginTop: 8 }]}>
           Other Study Groups
         </Text>
+        
 
         <View style={styles.groupsGrid}>
-          {otherStudyGroups.map(group => (
+          {filterGroups(otherStudyGroups).map(group => (
             <View key={group.id} style={styles.groupItem}>
-              <View style={styles.groupCircle}>
-                <Text style={styles.groupName}>{group.name}</Text>
-                <Text style={styles.groupCount}>{group.members}/10</Text>
-              </View>
+              <TouchableOpacity onPress={() => openDetails(group)}>
+                <View style={styles.groupCircle}>
+                  <Text style={styles.groupName}>{group.name}</Text>
+                  <Text style={styles.groupCount}>
+                    {group.members.length}/{group.maxSeats}
+                  </Text>
+                </View>
+              </TouchableOpacity>
 
+<<<<<<< HEAD
               <TouchableOpacity style={styles.joinButton}>
+=======
+              {/* putting join btn */}
+              <TouchableOpacity
+                style={styles.joinButton}
+                onPress={() => handleJoin(group)}
+              >
+>>>>>>> 7dee5498dc75095ee3c27796685289e042e57760
                 <Text style={styles.joinButtonText}>＋</Text>
               </TouchableOpacity>
 
@@ -94,7 +184,15 @@ export default function StudyGroups({ onBack }) {
         </View>
       </ScrollView>
 
+<<<<<<< HEAD
       <TouchableOpacity style={styles.createBar}>
+=======
+      {/* create a new one */}
+      <TouchableOpacity
+        style={styles.createBar}
+        onPress={() => onNavigate('create-study-group')}
+      >
+>>>>>>> 7dee5498dc75095ee3c27796685289e042e57760
         <Text style={styles.createBarText}>＋ Create new study group</Text>
       </TouchableOpacity>
     </SafeAreaView>
@@ -104,17 +202,17 @@ export default function StudyGroups({ onBack }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f6f8fb',
+    backgroundColor: '#f4f5f7',
     paddingHorizontal: 20,
   },
 
   mascot: {
     position: 'absolute',
-    bottom: -20,
-    left: -40,
-    width: 180,
-    height: 180,
-    opacity: 0.08,
+    bottom: -10,
+    left: -30,
+    width: 200,
+    height: 200,
+    opacity: 0.07,
     zIndex: -1,
   },
 
@@ -122,17 +220,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 24,
-    paddingBottom: 16,
-  },
-
-  headerTextWrap: {
-    flexDirection: 'column',
+    paddingTop: 26,
+    paddingBottom: 10,
   },
 
   appTitle: {
-    fontSize: 26,
-    fontWeight: '800',
+    fontSize: 32,
+    fontWeight: '900',
     color: '#000',
   },
 
@@ -142,22 +236,29 @@ const styles = StyleSheet.create({
 
   backText: {
     color: '#c5050c',
-    fontWeight: '600',
-    fontSize: 16,
+    fontWeight: '700',
+    fontSize: 18,
   },
 
   scrollContent: {
+<<<<<<< HEAD
     paddingBottom: 100, 
+=======
+    paddingBottom: 120,
+>>>>>>> 7dee5498dc75095ee3c27796685289e042e57760
   },
+
 
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 12,
-    color: '#4b4f58',
+    marginTop: 20,
+    marginBottom: 18,
+    color: '#303036',
   },
 
+<<<<<<< HEAD
   groupsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -224,39 +325,117 @@ const styles = StyleSheet.create({
     color: '#555',
     textAlign: 'center',
   },
+=======
+>>>>>>> 7dee5498dc75095ee3c27796685289e042e57760
 
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    marginTop: 4,
+    marginTop: 10,
+    marginBottom: 4,
   },
 
   searchInput: {
     flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#d0d5de',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+    borderRadius: 14,
+    borderWidth: 1.4,
+    borderColor: '#d4d7de',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
     backgroundColor: '#fff',
-    marginRight: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    marginRight: 10,
   },
 
   searchButton: {
     backgroundColor: '#c5050c',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 12,
   },
 
   searchButtonText: {
     color: '#fff',
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 14,
+  },
+
+  
+  groupsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+
+  groupItem: {
+    width: '48%',
+    alignItems: 'center',
+    marginBottom: 26,
+  },
+
+  groupCircle: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: '#c5050c',        
+    borderWidth: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+
+  groupName: {
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+    color: '#fff',                    
+    marginBottom: 10,
+  },
+
+  groupCount: {
+    fontSize: 14,
+    color: '#fff',                   
+    fontWeight: '600',
+  },
+
+
+  joinButton: {
+    marginTop: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#c5050c',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+
+  joinButtonText: {
+    color: '#fff',
+    fontSize: 26,
+    fontWeight: '800',
+    marginTop: -3,
+  },
+
+  joinLabel: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontWeight: '500',
   },
 
   createBar: {
@@ -265,14 +444,19 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: '#c5050c',
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
+
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: -2 },
   },
 
   createBarText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
   },
 });

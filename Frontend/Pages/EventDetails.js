@@ -241,10 +241,11 @@ const styles = StyleSheet.create({
 
   banner: {
     width: '100%',
-    height: 180,
-    resizeMode: 'contain',
+    height: 260,         
+    resizeMode: 'cover', 
     backgroundColor: '#fff',
   },
+
 
   contentContainer: {
     paddingHorizontal: 20,
