@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function StudyGroups({ onBack }) {
   const [search, setSearch] = useState('');
 
-  // Placeholder data just for UI
   const myStudyGroups = [
     { id: 1, name: 'CS 407 study group', members: 7 },
     { id: 2, name: 'CS 577 study group', members: 7 },
@@ -28,13 +27,11 @@ export default function StudyGroups({ onBack }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Background mascot */}
       <Image
         source={require('../../assets/Badger.png')}
         style={styles.mascot}
       />
 
-      {/* Header */}
       <View style={styles.headerRow}>
         <View style={styles.headerTextWrap}>
           <Text style={styles.appTitle}>Badger Burrow</Text>
@@ -49,7 +46,6 @@ export default function StudyGroups({ onBack }) {
         style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* My Study Groups */}
         <Text style={styles.sectionTitle}>My Study Groups</Text>
 
         <View style={styles.groupsGrid}>
@@ -59,12 +55,10 @@ export default function StudyGroups({ onBack }) {
                 <Text style={styles.groupName}>{group.name}</Text>
                 <Text style={styles.groupCount}>{group.members}/10</Text>
               </View>
-              {/* No "+" here for My Study Groups */}
             </View>
           ))}
         </View>
 
-        {/* Search Bar */}
         <View style={styles.searchRow}>
           <TextInput
             style={styles.searchInput}
@@ -78,7 +72,6 @@ export default function StudyGroups({ onBack }) {
           </TouchableOpacity>
         </View>
 
-        {/* Other Study Groups */}
         <Text style={[styles.sectionTitle, { marginTop: 8 }]}>
           Other Study Groups
         </Text>
@@ -91,7 +84,6 @@ export default function StudyGroups({ onBack }) {
                 <Text style={styles.groupCount}>{group.members}/10</Text>
               </View>
 
-              {/* "+" join button under circle */}
               <TouchableOpacity style={styles.joinButton}>
                 <Text style={styles.joinButtonText}>＋</Text>
               </TouchableOpacity>
@@ -102,7 +94,6 @@ export default function StudyGroups({ onBack }) {
         </View>
       </ScrollView>
 
-      {/* Bottom create bar */}
       <TouchableOpacity style={styles.createBar}>
         <Text style={styles.createBarText}>＋ Create new study group</Text>
       </TouchableOpacity>
@@ -156,7 +147,7 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingBottom: 100, // space above bottom bar
+    paddingBottom: 100, 
   },
 
   sectionTitle: {
@@ -224,7 +215,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 22,
     fontWeight: '700',
-    marginTop: -2, // visually center the "+"
+    marginTop: -2, 
   },
 
   joinLabel: {
