@@ -18,6 +18,7 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
 
@@ -25,6 +26,7 @@ export default function Listings({ onBack, onGoToNewListing }) {
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
   const [listings, setListings] = useState([]);
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     const q = query(collection(db, 'listings'), orderBy('createdAt', 'desc'));
@@ -41,18 +43,99 @@ export default function Listings({ onBack, onGoToNewListing }) {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const currentUser = auth.currentUser;
   console.log('Current user in Listings:', currentUser?.uid);
 
+  const getClosesAtMs = (item) => {
+    const value = item?.closesAt;
+    if (!value) return null;
+    if (typeof value.toMillis === 'function') return value.toMillis();
+    if (value.seconds != null) {
+      return value.seconds * 1000 + Math.floor((value.nanoseconds || 0) / 1e6);
+    }
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  const isListingClosed = (item) => {
+    if (!item) return false;
+    if (item.status === 'closed') return true;
+    const closesMs = getClosesAtMs(item);
+    if (!closesMs) return false;
+    return closesMs <= now;
+  };
+
+  const formatCountdown = (item) => {
+    const closesMs = getClosesAtMs(item);
+    if (!closesMs) return 'No end time';
+    const diff = closesMs - now;
+    if (diff <= 0) return 'Ended';
+
+    const totalMinutes = Math.floor(diff / 60000);
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const minutes = totalMinutes % 60;
+
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
+
+  const formatClosingLabel = (item) => {
+    const closesMs = getClosesAtMs(item);
+    if (!closesMs) return 'No closing time set';
+    return new Date(closesMs).toLocaleString([], {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
+  useEffect(() => {
+    const nowMs = now;
+    listings.forEach((item) => {
+      const closesMs = getClosesAtMs(item);
+      if (
+        item &&
+        item.status !== 'closed' &&
+        closesMs &&
+        closesMs <= nowMs
+      ) {
+        const ref = doc(db, 'listings', item.id);
+        updateDoc(ref, { status: 'closed', closedAt: serverTimestamp() }).catch(
+          (err) => console.log('Error marking listing closed:', err)
+        );
+      }
+    });
+  }, [listings, now]);
+
   const visibleListings = useMemo(() => {
-    let filtered = listings;
+    const openListings = listings.filter((l) => !isListingClosed(l));
+    const closedListings = listings.filter((l) => isListingClosed(l));
+
+    let filtered;
 
     if (activeTab === 'mine' && currentUser) {
-      filtered = filtered.filter((l) => l.ownerId === currentUser.uid);
+      filtered = openListings.filter((l) => l.ownerId === currentUser.uid);
     } else if (activeTab === 'top') {
-      filtered = [...filtered].sort(
+      filtered = [...openListings].sort(
         (a, b) => (b.currentBid || 0) - (a.currentBid || 0)
       );
+    } else if (activeTab === 'sold') {
+      filtered = closedListings.filter(
+        (l) =>
+          currentUser &&
+          (l.ownerId === currentUser.uid || l.lastBidderId === currentUser.uid)
+      );
+    } else {
+      filtered = openListings;
     }
 
     if (search.trim()) {
@@ -63,13 +146,25 @@ export default function Listings({ onBack, onGoToNewListing }) {
     }
 
     return filtered;
-  }, [listings, activeTab, search, currentUser]);
+  }, [listings, activeTab, search, currentUser, now]);
 
-  const handleBid = async (id, currentBid, startingPrice) => {
+  const handleBid = async (item) => {
+    const uid = currentUser?.uid;
+    if (!uid) {
+      Alert.alert('Sign in required', 'Please sign in to place a bid.');
+      return;
+    }
+
+    if (isListingClosed(item)) {
+      Alert.alert('Bidding closed', 'This listing is no longer accepting bids.');
+      return;
+    }
+
+    const currentBid = item.currentBid != null ? item.currentBid : item.startingPrice || 0;
     try {
-      const newBid = (currentBid != null ? currentBid : startingPrice || 0) + 1;
-      const ref = doc(db, 'listings', id);
-      await updateDoc(ref, { currentBid: newBid });
+      const newBid = currentBid + 1;
+      const ref = doc(db, 'listings', item.id);
+      await updateDoc(ref, { currentBid: newBid, lastBidderId: uid, status: 'open' });
     } catch (err) {
       console.log('Error bidding: ', err);
     }
@@ -148,6 +243,11 @@ export default function Listings({ onBack, onGoToNewListing }) {
           active={activeTab === 'top'}
           onPress={() => setActiveTab('top')}
         />
+        <TabChip
+          label="Bought/Sold"
+          active={activeTab === 'sold'}
+          onPress={() => setActiveTab('sold')}
+        />
       </View>
 
       {/* Search */}
@@ -167,6 +267,11 @@ export default function Listings({ onBack, onGoToNewListing }) {
         {visibleListings.map((item) => {
           const isOwner =
             currentUser && currentUser.uid === (item.ownerId || '');
+          const isClosed = isListingClosed(item);
+          const countdown = formatCountdown(item);
+          const closingLabel = formatClosingLabel(item);
+          const isWinner = currentUser && currentUser.uid === item.lastBidderId;
+          const pickupText = item.pickupLocation || 'Pick-up details not set';
 
           return (
             <View key={item.id} style={styles.card}>
@@ -191,6 +296,30 @@ export default function Listings({ onBack, onGoToNewListing }) {
                 </Text>
               </Text>
 
+              <Text style={styles.cardMetaText}>
+                Pick-up:{' '}
+                <Text style={styles.cardMetaHighlight}>{pickupText}</Text>
+              </Text>
+
+              <View style={styles.countdownRow}>
+                <View
+                  style={[
+                    styles.countdownPill,
+                    isClosed && styles.countdownPillClosed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.countdownText,
+                      isClosed && styles.countdownTextClosed,
+                    ]}
+                  >
+                    {isClosed ? 'Bidding ended' : `Ends in ${countdown}`}
+                  </Text>
+                </View>
+                <Text style={styles.countdownSub}>{closingLabel}</Text>
+              </View>
+
               {/* Badger image on right */}
               <View style={styles.cardImageWrapper}>
                 <Image
@@ -205,7 +334,25 @@ export default function Listings({ onBack, onGoToNewListing }) {
 
               {/* Bottom row: either Bid Now OR "Your listing" + Delete */}
               <View style={styles.cardBottomRow}>
-                {isOwner ? (
+                {isClosed ? (
+                  <View style={styles.closedRow}>
+                    <View style={styles.closedPill}>
+                      <Text style={styles.closedPillText}>Closed</Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.closedNote,
+                        isWinner && styles.winnerText,
+                      ]}
+                    >
+                      {isWinner
+                        ? 'You placed the last bid.'
+                        : isOwner
+                        ? 'Your listing has ended.'
+                        : 'Listing closed.'}
+                    </Text>
+                  </View>
+                ) : isOwner ? (
                   <>
                     <View style={styles.ownerPill}>
                       <Text style={styles.ownerPillText}>Your listing</Text>
@@ -220,13 +367,7 @@ export default function Listings({ onBack, onGoToNewListing }) {
                 ) : (
                   <TouchableOpacity
                     style={styles.bidButton}
-                    onPress={() =>
-                      handleBid(
-                        item.id,
-                        item.currentBid,
-                        item.startingPrice
-                      )
-                    }
+                    onPress={() => handleBid(item)}
                   >
                     <Text style={styles.bidButtonText}>Bid Now</Text>
                   </TouchableOpacity>
@@ -393,6 +534,46 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#c5050c',
   },
+  cardMetaText: {
+    fontSize: 12,
+    color: '#4a5568',
+    marginTop: 6,
+    paddingRight: 90,
+  },
+  cardMetaHighlight: {
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  countdownRow: {
+    marginTop: 8,
+    marginBottom: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingRight: 90,
+  },
+  countdownPill: {
+    backgroundColor: '#e8f0ff',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  countdownPillClosed: {
+    backgroundColor: '#ffeaea',
+  },
+  countdownText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  countdownTextClosed: {
+    color: '#991b1b',
+  },
+  countdownSub: {
+    fontSize: 12,
+    color: '#6b7280',
+    flex: 1,
+  },
   cardImageWrapper: {
     position: 'absolute',
     right: 14,
@@ -415,6 +596,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
     gap: 8,
+  },
+  closedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 8,
+  },
+  closedPill: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#ffeaea',
+  },
+  closedPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8b0000',
+  },
+  closedNote: {
+    fontSize: 13,
+    color: '#4a5568',
+    flex: 1,
+  },
+  winnerText: {
+    color: '#0b7a0b',
+    fontWeight: '700',
   },
   bidButton: {
     paddingVertical: 6,
