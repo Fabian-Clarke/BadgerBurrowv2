@@ -8,8 +8,8 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { collection, getCountFromServer } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { collection, getCountFromServer, doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../../firebase';
 
 const buttons = [
   { label: 'Listings', route: 'listings', copy: 'Discover campus deals.' },
@@ -21,6 +21,7 @@ export default function HomePage({ onNavigate }) {
   const [eventCount, setEventCount] = useState(null);
   const [userCount, setUserCount] = useState(null);
   const [loadingCounts, setLoadingCounts] = useState(true);
+  const [profileImageUrl, setProfileImageUrl] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -53,6 +54,37 @@ export default function HomePage({ onNavigate }) {
     };
   }, []);
 
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    async function fetchProfileImage() {
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        const snap = await getDoc(userRef);
+
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.profileImageUrl) {
+            setProfileImageUrl(data.profileImageUrl);
+            return;
+          }
+        }
+
+        if (user.photoURL) {
+          setProfileImageUrl(user.photoURL);
+        }
+      } catch (err) {
+        console.log('Failed to fetch profile image:', err);
+        if (user.photoURL) {
+          setProfileImageUrl(user.photoURL);
+        }
+      }
+    }
+
+    fetchProfileImage();
+  }, []);
+
   const renderStatValue = (value) =>
     loadingCounts || value === null ? '—' : value.toString();
 
@@ -75,7 +107,17 @@ export default function HomePage({ onNavigate }) {
           style={styles.accountButton}
           onPress={() => onNavigate('account')}
         >
-          <Text style={styles.accountText}>👤</Text>
+          {profileImageUrl ? (
+            <Image
+              source={{ uri: profileImageUrl }}
+              style={styles.accountAvatar}
+            />
+          ) : (
+            <Image
+              source={require('../../assets/Badger.png')}
+              style={styles.accountAvatar}
+            />
+          )}
         </TouchableOpacity>
       </View>
 
@@ -255,5 +297,10 @@ const styles = StyleSheet.create({
     height: 200,
     opacity: 0.17,
     zIndex: -1,
+  },
+    accountAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
 });
