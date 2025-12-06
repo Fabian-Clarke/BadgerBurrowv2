@@ -8,6 +8,7 @@ import {
   View,
   Image,
   Platform,
+  Switch,
 } from 'react-native';
 import DateTimePicker, {
   DateTimePickerAndroid,
@@ -75,6 +76,7 @@ export default function NewListing({ onBack }) {
   });
   const [showIOSPicker, setShowIOSPicker] = useState(false);
   const [message, setMessage] = useState('');
+  const [hidePickup, setHidePickup] = useState(true);
 
   const [imageUri, setImageUri] = useState(null);
 
@@ -200,6 +202,7 @@ export default function NewListing({ onBack }) {
         closesAt: closingDate,
         status: 'open',
         lastBidderId: null,
+        hidePickupUntilSold: hidePickup,
       });
 
       console.log('Listing created with id:', docRef.id);
@@ -214,6 +217,7 @@ export default function NewListing({ onBack }) {
       setClosingDate(resetDate);
       setImageUri(null);
       setMessage('');
+      setHidePickup(true);
 
       if (typeof onBack === 'function') {
         onBack();
@@ -291,6 +295,21 @@ export default function NewListing({ onBack }) {
             style={styles.iosPicker}
           />
         )}
+      </View>
+
+      <View style={[styles.section, styles.toggleRow]}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>Hide pick-up location until sold</Text>
+          <Text style={styles.toggleSub}>
+            When on, your pick-up location will only be shown to you and the buyer after the listing closes.
+          </Text>
+        </View>
+        <Switch
+          value={hidePickup}
+          onValueChange={setHidePickup}
+          thumbColor={hidePickup ? '#c5050c' : '#f4f3f4'}
+          trackColor={{ false: '#d1d5db', true: '#f8c4c4' }}
+        />
       </View>
 
       {/* Image picker + preview */}
@@ -428,6 +447,22 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 8,
     backgroundColor: '#eee',
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#fff',
+  },
+  toggleSub: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
   },
   iosPicker: {
     marginTop: 6,
