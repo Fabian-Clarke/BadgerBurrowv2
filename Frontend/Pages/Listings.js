@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   SafeAreaView,
   View,
@@ -34,12 +34,45 @@ export default function Listings({ onBack, onGoToNewListing }) {
     const q = query(collection(db, 'listings'), orderBy('createdAt', 'desc'));
 
     const unsub = onSnapshot(q, (snapshot) => {
+      // 1) Update UI with latest listings
       const items = snapshot.docs.map((d) => ({
         id: d.id,
         ...d.data(),
       }));
       console.log('Fetched listings:', items);
       setListings(items);
+
+      // 2) Notification: any modified listing that belongs to this user
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      snapshot.docChanges().forEach((change) => {
+        if (change.type !== 'modified') return;
+
+        const data = change.doc.data();
+        const item = { id: change.doc.id, ...data };
+
+        const isOwner = item.ownerId === uid;
+        if (!isOwner) return;
+
+        const bid =
+          item.currentBid != null
+            ? item.currentBid
+            : item.startingPrice || 0;
+
+        console.log('Bid notif for owner:', {
+          title: item.title,
+          id: item.id,
+          bid,
+          ownerId: item.ownerId,
+          uid,
+        });
+
+        Alert.alert(
+          'New bid placed',
+          `Your listing "${item.title}" now has a bid of $${bid}.`
+        );
+      });
     });
 
     return () => unsub();
