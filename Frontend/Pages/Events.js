@@ -13,8 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { auth, db } from '../../firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-
-// --- simple flag for "event created" toast; NO hooks here ---
 export let justCreatedEventFlag = false;
 
 export function markEventCreatedFlag() {
@@ -28,18 +26,15 @@ export function consumeEventCreatedFlag() {
 }
 
 export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
-  // ---- hooks: ALWAYS in this order, no conditionals above them ----
   const [activeTab, setActiveTab] = useState('recent');
   const [search, setSearch] = useState('');
   const [events, setEvents] = useState([]);
   const [showCreatedMessage, setShowCreatedMessage] = useState(false);
 
-  // which events we already notified about
   const notifiedEventsRef = useRef(new Set());
 
   const user = auth.currentUser;
 
-  // show “event created successfully” message when we come back from AddEvent
   useEffect(() => {
     if (consumeEventCreatedFlag()) {
       setShowCreatedMessage(true);
@@ -73,7 +68,7 @@ export default function Events({ onBack, onGoToAddEvent, onOpenEventDetails }) {
     });
   }, [search, events]);
 
-  // helper to get millis for sort/recent tabs (no hooks here)
+  
   const getStartTime = (event) => {
     if (
       event.startDateTime &&
