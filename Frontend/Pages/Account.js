@@ -1,9 +1,27 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
-import { Text, TouchableOpacity, StyleSheet, View, TextInput, Alert } from 'react-native';
-import { signOut, updatePassword, deleteUser } from 'firebase/auth';
+import { useState, useEffect } from 'react';
+import {
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  View,
+  TextInput,
+  Alert,
+  Image,
+} from 'react-native';
+import {
+  signOut,
+  updatePassword,
+  deleteUser,
+  updateProfile,
+} from 'firebase/auth';
 import { auth, db } from '../../firebase';
-import { doc, deleteDoc } from 'firebase/firestore';
+import { doc, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
+import * as ImagePicker from 'expo-image-picker';
+import {
+  CLOUDINARY_CLOUD_NAME,
+  CLOUDINARY_UPLOAD_PRESET,
+} from '../../cloudinary';
 
 export default function Account({ onBack }) {
   const [message, setMessage] = useState('');
@@ -11,11 +29,123 @@ export default function Account({ onBack }) {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   const user = auth.currentUser;
   const email = user?.email || 'Unknown user';
   const username = user?.displayName || email.split('@')[0] || 'Unknown';
   const maskedPassword = '********';
+
+  useEffect(() => {
+    if (!user) return;
+
+    async function fetchProfileImage() {
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        const snap = await getDoc(userRef);
+
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.profileImageUrl) {
+            setProfileImageUrl(data.profileImageUrl);
+            return;
+          }
+        }
+
+        // Fallback to auth photoURL if set
+        if (user.photoURL) {
+          setProfileImageUrl(user.photoURL);
+        }
+      } catch (err) {
+        console.log('Failed to fetch profile image:', err);
+        if (user.photoURL) {
+          setProfileImageUrl(user.photoURL);
+        }
+      }
+    }
+
+    fetchProfileImage();
+  }, [user]);
+
+  async function uploadImageToCloudinary(uri) {
+    const formData = new FormData();
+
+    formData.append('file', {
+      uri,
+      type: 'image/jpeg',
+      name: 'profile-image.jpg',
+    });
+
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'Cloudinary upload failed');
+    }
+
+    return data.secure_url;
+  }
+
+  const handlePickProfileImage = async () => {
+    if (!user) {
+      setMessage('You must be signed in to change your profile picture.');
+      return;
+    }
+
+    try {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== 'granted') {
+        setMessage('Permission is required to change your profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return; 
+      }
+
+      const localUri = result.assets[0].uri;
+
+      setUploading(true);
+      const uploadedUrl = await uploadImageToCloudinary(localUri);
+
+      // Update Firebase Auth profile
+      await updateProfile(user, { photoURL: uploadedUrl });
+
+      // Update Firestore user doc 
+      await setDoc(
+        doc(db, 'users', user.uid),
+        { profileImageUrl: uploadedUrl },
+        { merge: true }
+      );
+
+      setProfileImageUrl(uploadedUrl);
+      setMessage('');
+    } catch (err) {
+      console.log('Error updating profile picture:', err);
+      setMessage('Failed to update profile picture. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -37,6 +167,36 @@ export default function Account({ onBack }) {
       <Text style={styles.title}>Account</Text>
       <Text style={styles.subtitle}>Manage your credentials</Text>
       {message ? <Text style={styles.message}>{message}</Text> : null}
+
+      {/* Avatar + change photo */}
+      <View style={styles.avatarContainer}>
+        <TouchableOpacity
+          onPress={handlePickProfileImage}
+          disabled={uploading}
+          style={styles.avatarTouchable}
+        >
+          {profileImageUrl ? (
+            <Image
+              source={{ uri: profileImageUrl }}
+              style={styles.avatar}
+            />
+          ) : (
+            <Image
+              source={require('../../assets/Badger.png')}
+              style={styles.avatar}
+            />
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={handlePickProfileImage}
+          disabled={uploading}
+        >
+          <Text style={styles.changePhotoText}>
+            {uploading ? 'Updating photo...' : 'Change profile picture'}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.infoCard}>
         <InfoRow label="Email" value={email} />
@@ -282,5 +442,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 16,
+  },
+    avatarContainer: {
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  avatarTouchable: {
+    borderRadius: 50,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  changePhotoText: {
+    fontSize: 14,
+    color: '#c5050c',
+    fontWeight: '500',
   },
 });

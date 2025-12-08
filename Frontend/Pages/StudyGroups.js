@@ -36,13 +36,13 @@ export default function StudyGroups({ onBack, onNavigate, setSelectedGroup }) {
   const myStudyGroups = groups.filter((g) => g.members.includes(uid));
   const otherStudyGroups = groups.filter((g) => !g.members.includes(uid));
 
-  //searching
+  // searching
   const filterGroups = (arr) =>
     arr.filter((g) =>
       g.name.toLowerCase().includes(search.toLowerCase())
     );
 
-  //this will join the group
+  // this will join the group
   const handleJoin = async (group) => {
     try {
       await updateDoc(doc(db, 'studyGroups', group.id), {
@@ -53,7 +53,7 @@ export default function StudyGroups({ onBack, onNavigate, setSelectedGroup }) {
     }
   };
 
-  //this will nav to the detail section
+  // this will nav to the detail section
   const openDetails = (group) => {
     setSelectedGroup(group);
     onNavigate('study-group-details');
@@ -61,13 +61,12 @@ export default function StudyGroups({ onBack, onNavigate, setSelectedGroup }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/*trying to use mascot*/}
+      {/* trying to use mascot */}
       <Image
         source={require('../../assets/Badger.png')}
         style={styles.mascot}
       />
 
-      {/**/}
       <View style={styles.headerRow}>
         <View style={styles.headerTextWrap}>
           <Text style={styles.appTitle}>Badger Burrow</Text>
@@ -96,11 +95,11 @@ export default function StudyGroups({ onBack, onNavigate, setSelectedGroup }) {
           </TouchableOpacity>
         </View>
 
-        {/* study grp */}
+        {/* My Study Groups */}
         <Text style={styles.sectionTitle}>My Study Groups</Text>
 
         <View style={styles.groupsGrid}>
-          {filterGroups(myStudyGroups).map(group => (
+          {filterGroups(myStudyGroups).map((group) => (
             <TouchableOpacity
               key={group.id}
               style={styles.groupItem}
@@ -116,14 +115,13 @@ export default function StudyGroups({ onBack, onNavigate, setSelectedGroup }) {
           ))}
         </View>
 
-        {/* Other */}
+        {/* Other Study Groups */}
         <Text style={[styles.sectionTitle, { marginTop: 8 }]}>
           Other Study Groups
         </Text>
-        
 
         <View style={styles.groupsGrid}>
-          {filterGroups(otherStudyGroups).map(group => (
+          {filterGroups(otherStudyGroups).map((group) => (
             <View key={group.id} style={styles.groupItem}>
               <TouchableOpacity onPress={() => openDetails(group)}>
                 <View style={styles.groupCircle}>
@@ -134,7 +132,7 @@ export default function StudyGroups({ onBack, onNavigate, setSelectedGroup }) {
                 </View>
               </TouchableOpacity>
 
-              {/* putting join btn */}
+              {/* join button */}
               <TouchableOpacity
                 style={styles.joinButton}
                 onPress={() => handleJoin(group)}
@@ -184,6 +182,10 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
 
+  headerTextWrap: {
+    flex: 1,
+  },
+
   appTitle: {
     fontSize: 32,
     fontWeight: '900',
@@ -204,7 +206,6 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
 
-
   sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
@@ -213,7 +214,6 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     color: '#303036',
   },
-
 
   searchRow: {
     flexDirection: 'row',
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: '#c5050c',        
+    backgroundColor: '#c5050c',
     borderWidth: 0,
     justifyContent: 'center',
     alignItems: 'center',
@@ -284,13 +284,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
-    color: '#fff',                    
+    color: '#fff',
     marginBottom: 10,
   },
 
   groupCount: {
     fontSize: 14,
-    color: '#fff',                   
+    color: '#fff',
     fontWeight: '600',
   },
 

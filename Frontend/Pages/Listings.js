@@ -142,24 +142,23 @@ export default function Listings({ onBack, onGoToNewListing }) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <TouchableOpacity style={styles.backButton} onPress={onBack}>
+        <Text style={styles.backText}>← Back</Text>
+      </TouchableOpacity>
+
       <Image
         source={require('../../assets/Badger.png')}
         style={styles.mascot}
       />
 
-      <View style={styles.headerWrapper}>
-        <View style={styles.headerText}>
-          <Text style={styles.appTitle}>Listings</Text>
-          <Text style={styles.appSubtitle}>
-            Browse and bid on items from fellow Badgers.
-          </Text>
-        </View>
-
-        <TouchableOpacity style={styles.headerBack} onPress={onBack}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
+      <View style={styles.header}>
+        <Text style={styles.appTitle}>Listings</Text>
+        <Text style={styles.appSubtitle}>
+          Browse and bid on items from fellow Badgers.
+        </Text>
       </View>
 
+      {/* New Listing */}
       <TouchableOpacity
         style={styles.newListingButton}
         onPress={onGoToNewListing}
@@ -167,6 +166,7 @@ export default function Listings({ onBack, onGoToNewListing }) {
         <Text style={styles.newListingText}>New Listing</Text>
       </TouchableOpacity>
 
+      {/* Tabs */}
       <View style={styles.tabsRow}>
         <TabChip
           label="All Listings"
@@ -185,6 +185,7 @@ export default function Listings({ onBack, onGoToNewListing }) {
         />
       </View>
 
+      {/* Search */}
       <TextInput
         style={styles.searchInput}
         placeholder="Text Search"
@@ -193,6 +194,7 @@ export default function Listings({ onBack, onGoToNewListing }) {
         placeholderTextColor="#9aa0ad"
       />
 
+      {/* List */}
       <ScrollView
         style={styles.listArea}
         contentContainerStyle={styles.listContent}
@@ -203,14 +205,17 @@ export default function Listings({ onBack, onGoToNewListing }) {
 
           return (
             <View key={item.id} style={styles.card}>
+              {/* Title */}
               <Text style={styles.cardTitle}>{item.title}</Text>
 
+              {/* Description */}
               {item.description ? (
                 <Text style={styles.cardDesc} numberOfLines={2}>
                   {item.description}
                 </Text>
               ) : null}
 
+              {/* Bid text */}
               <Text style={styles.cardBidLabel}>
                 Current Bid:{' '}
                 <Text style={styles.cardBidValue}>
@@ -221,29 +226,44 @@ export default function Listings({ onBack, onGoToNewListing }) {
                 </Text>
               </Text>
 
+              {/* Badger image on right */}
               <View style={styles.cardImageWrapper}>
                 <Image
-                  source={require('../../assets/Badger.png')}
+                  source={
+                    item.imageUrl
+                      ? { uri: item.imageUrl }
+                      : require('../../assets/Badger.png')
+                  }
                   style={styles.cardImage}
                 />
               </View>
 
+              {/* Bottom row: either Bid Now OR "Your listing" + Delete */}
               <View style={styles.cardBottomRow}>
-                <TouchableOpacity
-                  style={styles.bidButton}
-                  onPress={() =>
-                    handleBid(item.id, item.currentBid, item.startingPrice)
-                  }
-                >
-                  <Text style={styles.bidButtonText}>Bid Now</Text>
-                </TouchableOpacity>
-
-                {isOwner && (
+                {isOwner ? (
+                  <>
+                    <View style={styles.ownerPill}>
+                      <Text style={styles.ownerPillText}>Your listing</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => confirmDelete(item)}
+                    >
+                      <Text style={styles.deleteText}>Delete</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
                   <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => confirmDelete(item)}
+                    style={styles.bidButton}
+                    onPress={() =>
+                      handleBid(
+                        item.id,
+                        item.currentBid,
+                        item.startingPrice
+                      )
+                    }
                   >
-                    <Text style={styles.deleteText}>Delete</Text>
+                    <Text style={styles.bidButtonText}>Bid Now</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -276,8 +296,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f6f8fb',
-    paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingHorizontal: 20,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 40,
+    right: 16,      
+    zIndex: 10,
+    padding: 8,
   },
   backText: {
     fontSize: 16,
@@ -446,6 +472,17 @@ const styles = StyleSheet.create({
     color: '#c5050c',
     fontSize: 13,
     fontWeight: '600',
+  },
+  ownerPill: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#e5eef7',
+  },
+  ownerPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#44516b',
   },
   emptyText: {
     textAlign: 'center',
