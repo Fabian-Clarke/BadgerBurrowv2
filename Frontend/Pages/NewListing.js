@@ -7,7 +7,12 @@ import {
   StyleSheet,
   View,
   Image,
+  Platform,
+  Switch,
 } from 'react-native';
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from '@react-native-community/datetimepicker';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
 
@@ -47,16 +52,35 @@ async function uploadImageToCloudinary(uri) {
   return data.secure_url;
 }
 
+function formatDateLabel(date) {
+  if (!date) return 'Select a closing time';
+  return date.toLocaleString([], {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
 
 export default function NewListing({ onBack }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startingPrice, setStartingPrice] = useState('');
+  const [pickupLocation, setPickupLocation] = useState('');
+  const [closingDate, setClosingDate] = useState(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setMinutes(0, 0, 0);
+    return tomorrow;
+  });
+  const [showIOSPicker, setShowIOSPicker] = useState(false);
   const [message, setMessage] = useState('');
+  const [hidePickup, setHidePickup] = useState(true);
 
   const [imageUri, setImageUri] = useState(null);
 
-    const handlePickImage = async () => {
+  const handlePickImage = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
@@ -67,7 +91,7 @@ export default function NewListing({ onBack }) {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [1, 1], 
+        aspect: [1, 1],
         quality: 1,
       });
 
@@ -81,7 +105,44 @@ export default function NewListing({ onBack }) {
     }
   };
 
-    const handleCreate = async () => {
+  const handleOpenDatePicker = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: closingDate || new Date(),
+        mode: 'date',
+        onChange: (event, selectedDate) => {
+          if (event.type === 'dismissed' || !selectedDate) return;
+
+          const withDate = new Date(closingDate || new Date());
+          withDate.setFullYear(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate()
+          );
+
+          DateTimePickerAndroid.open({
+            value: withDate,
+            mode: 'time',
+            onChange: (evt2, selectedTime) => {
+              if (evt2.type === 'dismissed' || !selectedTime) return;
+              const merged = new Date(withDate);
+              merged.setHours(
+                selectedTime.getHours(),
+                selectedTime.getMinutes(),
+                0,
+                0
+              );
+              setClosingDate(merged);
+            },
+          });
+        },
+      });
+    } else {
+      setShowIOSPicker(true);
+    }
+  };
+
+  const handleCreate = async () => {
     console.log('Create Listing pressed');
 
     try {
@@ -101,9 +162,20 @@ export default function NewListing({ onBack }) {
         return;
       }
 
+      const trimmedLocation = pickupLocation.trim();
+      if (!trimmedLocation) {
+        setMessage('Pick-up location is required.');
+        return;
+      }
+
       const priceNumber = Number(startingPrice);
       if (Number.isNaN(priceNumber)) {
         setMessage('Starting price must be a number.');
+        return;
+      }
+
+      if (!closingDate || closingDate.getTime() <= Date.now()) {
+        setMessage('Closing date and time must be in the future.');
         return;
       }
 
@@ -126,6 +198,11 @@ export default function NewListing({ onBack }) {
         ownerId: user.uid,
         createdAt: serverTimestamp(),
         imageUrl: imageUrl || null, // store in Firestore
+        pickupLocation: trimmedLocation,
+        closesAt: closingDate,
+        status: 'open',
+        lastBidderId: null,
+        hidePickupUntilSold: hidePickup,
       });
 
       console.log('Listing created with id:', docRef.id);
@@ -133,8 +210,14 @@ export default function NewListing({ onBack }) {
       setTitle('');
       setDescription('');
       setStartingPrice('');
+      setPickupLocation('');
+      const resetDate = new Date();
+      resetDate.setDate(resetDate.getDate() + 1);
+      resetDate.setMinutes(0, 0, 0);
+      setClosingDate(resetDate);
       setImageUri(null);
       setMessage('');
+      setHidePickup(true);
 
       if (typeof onBack === 'function') {
         onBack();
@@ -168,13 +251,66 @@ export default function NewListing({ onBack }) {
         multiline
       />
 
-            <TextInput
+      <TextInput
         style={styles.input}
         placeholder="Starting price"
         value={startingPrice}
         onChangeText={setStartingPrice}
         keyboardType="numeric"
       />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Pick-up location"
+        value={pickupLocation}
+        onChangeText={setPickupLocation}
+      />
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Bidding closes</Text>
+        <View style={styles.dateRow}>
+          <Text style={styles.dateText}>{formatDateLabel(closingDate)}</Text>
+          <TouchableOpacity
+            style={styles.dateButton}
+            onPress={handleOpenDatePicker}
+          >
+            <Text style={styles.dateButtonText}>Choose</Text>
+          </TouchableOpacity>
+        </View>
+        {Platform.OS === 'ios' && showIOSPicker && (
+          <DateTimePicker
+            value={closingDate || new Date()}
+            mode="datetime"
+            display="spinner"
+            onChange={(event, selectedDate) => {
+              if (event.type === 'dismissed') {
+                setShowIOSPicker(false);
+                return;
+              }
+              if (selectedDate) {
+                setShowIOSPicker(false);
+                setClosingDate(selectedDate);
+              }
+            }}
+            style={styles.iosPicker}
+          />
+        )}
+      </View>
+
+      <View style={[styles.section, styles.toggleRow]}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>Hide pick-up location until sold</Text>
+          <Text style={styles.toggleSub}>
+            When on, your pick-up location will only be shown to you and the buyer after the listing closes.
+          </Text>
+        </View>
+        <Switch
+          value={hidePickup}
+          onValueChange={setHidePickup}
+          thumbColor={hidePickup ? '#c5050c' : '#f4f3f4'}
+          trackColor={{ false: '#d1d5db', true: '#f8c4c4' }}
+        />
+      </View>
 
       {/* Image picker + preview */}
       <View style={styles.imageRow}>
@@ -207,13 +343,13 @@ const styles = StyleSheet.create({
   backButton: {
     position: 'absolute',
     top: 40,
-    right: 16,       
+    right: 16,
     padding: 8,
   },
   backText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#c5050c', 
+    color: '#c5050c',
   },
   title: {
     fontSize: 24,
@@ -235,6 +371,43 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
   },
+  section: {
+    marginBottom: 12,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4a5568',
+    marginBottom: 6,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#d0d5de',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  dateText: {
+    fontSize: 15,
+    color: '#111',
+    flex: 1,
+  },
+  dateButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#c5050c',
+  },
+  dateButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   button: {
     backgroundColor: '#c5050c',
     paddingVertical: 14,
@@ -251,7 +424,7 @@ const styles = StyleSheet.create({
     color: '#c5050c',
     marginBottom: 4,
   },
-    imageRow: {
+  imageRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
@@ -274,5 +447,24 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 8,
     backgroundColor: '#eee',
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#fff',
+  },
+  toggleSub: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  iosPicker: {
+    marginTop: 6,
   },
 });
