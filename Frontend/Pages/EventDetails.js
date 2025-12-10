@@ -19,6 +19,7 @@ import {
   increment,
   deleteDoc,
 } from 'firebase/firestore';
+import { addEventToCalendar } from '../../calendarUtils';
 
 export default function EventDetails({ onBack, event }) {
   // Fallback placeholder event if none is passed 
@@ -119,6 +120,28 @@ export default function EventDetails({ onBack, event }) {
     }
   };
 
+  const handleAddToCalendar = async () => {
+    try {
+      const payload = event || {
+        title: data.title,
+        description: data.description,
+        location: data.location,
+      };
+
+      await addEventToCalendar(payload);
+      Alert.alert(
+        'Added to calendar',
+        'This event has been added to your calendar.'
+      );
+    } catch (err) {
+      console.log('Error adding event to calendar:', err);
+      Alert.alert(
+        'Error',
+        'Could not add this event to your calendar. Please try again.'
+      );
+    }
+  };
+
   // Use uploaded image if provided, otherwise fallback to Badger.png
   const bannerSource =
     event && event.imageUrl
@@ -186,6 +209,15 @@ export default function EventDetails({ onBack, event }) {
             <Text style={styles.infoLabel}>📝 Description</Text>
             <Text style={styles.infoValue}>{data.description}</Text>
           </View>
+
+          {/* Calender */}
+          <TouchableOpacity
+            style={styles.calendarButton}
+            onPress={handleAddToCalendar}
+          >
+            <Text style={styles.calendarButtonText}>Add to Calendar</Text>
+          </TouchableOpacity>
+
 
           {/* Like button */}
           {event && (
@@ -289,6 +321,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#222',
   },
+
+  calendarButton: {
+    marginTop: 24,
+    alignSelf: 'center',
+    backgroundColor: '#c5050c',
+    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+  },
+  calendarButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+
   likeButton: {
     marginTop: 20,
     alignSelf: 'center',
